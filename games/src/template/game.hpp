@@ -38,16 +38,7 @@ private:
     std::mutex _game_mutex;
 
     /// @brief Registers all available commands to their respective member functions.
-    void RegisterCommands() {
-        // Usamos lambdas capturando [this] para poder chamar os métodos privados da classe
-        _command_registry["ConnectClient"] = [this](int fd, const std::string& mid, int cid, std::istringstream& iss, Server& srv) {
-            this->HandleConnectClient(fd, mid, cid, iss, srv);
-        };
-        
-        _command_registry["PlayerAction"] = [this](int fd, const std::string& mid, int cid, std::istringstream& iss, Server& srv) {
-            this->HandlePlayerAction(fd, mid, cid, iss, srv);
-        };
-    }
+    void RegisterCommands();
 
     // Handlers
     /// @brief Handles the "ConnectClient" command, adding a new player to the game if they are not already connected.
