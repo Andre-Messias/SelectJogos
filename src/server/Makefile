@@ -1,19 +1,16 @@
 COMPILER = g++
-FLAGS = -Wall -Wextra -std=c++17 -pthread -I$(LIB)
+FLAGS = -Wall -Wextra -std=c++17 -pthread -I$(INC_DIR) -I$(SRC_DIR)/network -I$(SRC_DIR)/room -I$(SRC_DIR)/core
 
 TARGET = lobby
 PORT = 8080
 
-LIB = lib
+INC_DIR = include
+SRC_DIR = src
 OBJ_DIR = objs
 
-LIB_HEADERS = $(wildcard $(LIB)/*.hpp)
-LIB_SRCS = $(wildcard $(LIB)/*.cpp)
-
-HEADERS = $(wildcard *.hpp)
-
-SRCS = $(wildcard *.cpp) $(LIB_SRCS)
-OBJS = $(patsubst %.cpp, $(OBJ_DIR)/%.o, $(SRCS))
+HEADERS = $(wildcard $(INC_DIR)/*.hpp $(SRC_DIR)/*.hpp $(SRC_DIR)/*/*.hpp)
+SRCS = $(wildcard $(SRC_DIR)/*.cpp $(SRC_DIR)/*/*.cpp)
+OBJS = $(patsubst $(SRC_DIR)/%.cpp, $(OBJ_DIR)/%.o, $(SRCS))
 
 all: $(TARGET)
 
@@ -23,7 +20,7 @@ run: all
 $(TARGET): $(OBJS)
 	$(COMPILER) $(FLAGS) -o $@ $^
 
-$(OBJ_DIR)/%.o: %.cpp $(HEADERS) $(LIB_HEADERS)
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp $(HEADERS)
 	@mkdir -p $(dir $@)
 	$(COMPILER) $(FLAGS) -c $< -o $@
 
