@@ -1,8 +1,9 @@
 COMPILER = g++
 FLAGS = -Wall -Wextra -std=c++17 -pthread -I$(LIB)
 
-TARGET = game
-PORT = 8080
+BUILD_DIR = build
+TARGET = $(BUILD_DIR)/game
+PORT ?= 8080
 
 LIB = lib
 OBJ_DIR = objs
@@ -21,6 +22,7 @@ run: all
 	./$(TARGET) $(PORT)
 
 $(TARGET): $(OBJS)
+	@mkdir -p $(dir $@)
 	$(COMPILER) $(FLAGS) -o $@ $^
 
 $(OBJ_DIR)/%.o: %.cpp $(HEADERS) $(LIB_HEADERS)
@@ -28,6 +30,6 @@ $(OBJ_DIR)/%.o: %.cpp $(HEADERS) $(LIB_HEADERS)
 	$(COMPILER) $(FLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(OBJ_DIR) $(TARGET)
+	rm -rf $(OBJ_DIR) $(BUILD_DIR)
 
 .PHONY: all run clean
