@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <csignal>
 
 #include "server.hpp"
 #include "game.hpp"
@@ -13,6 +14,9 @@ int main(int argc, char* argv[]) {
         std::cerr << "Usage: " << argv[0] << " <PORT>\n";
         return 1;
     }
+
+    // Ignore SIGPIPE to prevent disconnected sockets from terminating the game process
+    std::signal(SIGPIPE, SIG_IGN);
 
     // Setup server and game
     int port = std::stoi(argv[1]);

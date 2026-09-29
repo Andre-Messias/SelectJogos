@@ -6,7 +6,10 @@
 #include <thread>
 #include <vector>
 #include <mutex>
+#include <atomic>
 #include <algorithm>
+#include <cerrno>
+#include <cstddef>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
@@ -41,6 +44,9 @@ class Server {
         void Start();
 
     private:
+        /// @brief Maximum allowed bytes in a socket read buffer before dropping the connection.
+        static constexpr size_t MAX_BUFFER_SIZE = 8192;
+
         /// @brief The port number on which the server listens for incoming connections.
         int _port;
 
@@ -48,7 +54,7 @@ class Server {
         int _server_fd;
 
         /// @brief A flag indicating whether the server is currently running. Used to control the main loop in the Start method.
-        bool _is_running;
+        std::atomic<bool> _is_running;
         
         /// @brief Handles communication with a connected client. Reads tokens from the client and invokes the message received callback.
         MessageEventHandler _on_message_callback;

@@ -40,6 +40,13 @@ private:
     /// @brief Registers all available commands to their respective member functions.
     void RegisterCommands();
 
+    /// @brief Counts the number of players currently connected to the match.
+    /// @return The number of active connected players.
+    size_t GetConnectedPlayerCount() const;
+
+    /// @brief Resets the round counter and clears the played state of all registered players.
+    void ResetRoundState();
+
     // Handlers
     /// @brief Handles the "ConnectClient" command, adding a new player to the game if they are not already connected.
     /// @param socket_fd The file descriptor of the socket from which the message was received.
@@ -49,6 +56,22 @@ private:
     /// @param server The server instance handling the game.
     void HandleConnectClient(int socket_fd, const std::string& msg_id, int client_id, std::istringstream& /*iss*/, Server& server);
 
+    /// @brief Handles the "DisconnectClient" command, marking an existing player as disconnected and cleaning up pending round actions.
+    /// @param socket_fd The file descriptor of the socket from which the message was received.
+    /// @param msg_id The ID of the message.
+    /// @param client_id The ID of the client who disconnected.
+    /// @param iss The input string stream containing the message data.
+    /// @param server The server instance handling the game.
+    void HandleDisconnectClient(int socket_fd, const std::string& msg_id, int client_id, std::istringstream& /*iss*/, Server& server);
+
+    /// @brief Handles the "ReconnectClient" command, restoring the connected status of a returning player.
+    /// @param socket_fd The file descriptor of the socket from which the message was received.
+    /// @param msg_id The ID of the message.
+    /// @param client_id The ID of the client who reconnected.
+    /// @param iss The input string stream containing the message data.
+    /// @param server The server instance handling the game.
+    void HandleReconnectClient(int socket_fd, const std::string& msg_id, int client_id, std::istringstream& /*iss*/, Server& server);
+
     /// @brief Handles the "PlayerAction" command, processing the player's action and updating the game state.
     /// @param socket_fd The file descriptor of the socket from which the message was received.
     /// @param msg_id The ID of the message.
@@ -56,4 +79,12 @@ private:
     /// @param iss The input string stream containing the message data.
     /// @param server The server instance handling the game.
     void HandlePlayerAction(int socket_fd, const std::string& msg_id, int client_id, std::istringstream& iss, Server& server);
+
+    /// @brief Handles the administrative "ResetRound" command (requires effective ClientID == 0 via ServerAction).
+    /// @param socket_fd The file descriptor of the socket from which the message was received.
+    /// @param msg_id The ID of the message.
+    /// @param client_id The effective ID of the caller (must be 0 for administrative actions).
+    /// @param iss The input string stream containing the message data.
+    /// @param server The server instance handling the game.
+    void HandleResetRound(int socket_fd, const std::string& msg_id, int client_id, std::istringstream& /*iss*/, Server& server);
 };
