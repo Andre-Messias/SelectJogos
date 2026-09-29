@@ -1,5 +1,5 @@
 COMPILER = g++
-FLAGS = -Wall -Wextra -std=c++17 -pthread -I$(INC_DIR) -I$(SRC_DIR)
+FLAGS = -Wall -Wextra -std=c++17 -pthread -I$(INC_DIR) -I$(SRC_DIR) -I$(SRC_DIR)/core -I$(SRC_DIR)/network -I$(SRC_DIR)/ui
 
 TARGET = client
 HOST ?= 127.0.0.1
