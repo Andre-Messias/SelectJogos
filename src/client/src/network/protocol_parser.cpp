@@ -1,5 +1,4 @@
 #include "protocol_parser.hpp"
-#include <sstream>
 #include <fstream>
 #include <iostream>
 #include <algorithm>
@@ -8,12 +7,13 @@
 ProtocolParser::ProtocolParser(ClientState& state, NetworkClient& network, const std::string& help_filepath)
     : _state(state), _network(network), _help_filepath(help_filepath), _msg_counter(1) {
     RegisterAliases();
+    RegisterScreenDirectives();
 }
 
 void ProtocolParser::RegisterAliases() {
     // Local Client commands
-    _command_aliases["h"] = "Help";
     _command_aliases["help"] = "Help";
+    _command_aliases["h"] = "Help";
     _command_aliases["?"] = "Help";
 
     // Discovery commands
@@ -38,13 +38,52 @@ void ProtocolParser::RegisterAliases() {
     _command_aliases["sa"] = "ServerAction";
     _command_aliases["serveraction"] = "ServerAction";
     _command_aliases["kp"] = "KickPlayer";
-    _command_aliases["kickplayer"] = "KickPlayer";
+    _command_aliases["kickplayer"]  = "KickPlayer";
 
     // Common In-Game and Admin commands
     _command_aliases["pa"] = "PlayerAction";
     _command_aliases["playeraction"] = "PlayerAction";
     _command_aliases["rr"] = "ResetRound";
     _command_aliases["resetround"] = "ResetRound";
+}
+
+void ProtocolParser::RegisterScreenDirectives() {
+    _screen_directives["@SCREEN"] = [this](std::istringstream& iss) {
+        std::string content;
+        std::getline(iss >> std::ws, content);
+        std::vector<std::string> lines;
+        std::istringstream stream(content);
+        std::string segment;
+        while (std::getline(stream, segment, '|')) {
+            size_t first = segment.find_first_not_of(" \t\r\n");
+            size_t last = segment.find_last_not_of(" \t\r\n");
+            if (first != std::string::npos && last != std::string::npos) {
+                lines.push_back(segment.substr(first, last - first + 1));
+            } else {
+                lines.push_back("");
+            }
+        }
+        _state.SetCanvasLines(lines);
+    };
+
+    _screen_directives["@LINE"] = [this](std::istringstream& iss) {
+        size_t idx;
+        if (iss >> idx) {
+            std::string text;
+            std::getline(iss >> std::ws, text);
+            _state.SetCanvasLine(idx, text);
+        }
+    };
+
+    _screen_directives["@CLEAR"] = [this](std::istringstream& /*iss*/) {
+        _state.ClearCanvas();
+    };
+
+    _screen_directives["@ALERT"] = [this](std::istringstream& iss) {
+        std::string alert_text;
+        std::getline(iss >> std::ws, alert_text);
+        _state.SetAlert(alert_text);
+    };
 }
 
 std::string ProtocolParser::ResolveCommandAlias(const std::string& input_cmd) const {
@@ -56,7 +95,6 @@ std::string ProtocolParser::ResolveCommandAlias(const std::string& input_cmd) co
     if (it != _command_aliases.end()) {
         return it->second;
     }
-    
     return input_cmd;
 }
 
@@ -81,7 +119,6 @@ void ProtocolParser::PrintHelpMenu() {
         if (!line.empty() && line.back() == '\r') {
             line.pop_back();
         }
-        // Skip empty lines or comment lines starting with '#'
         if (line.empty() || line.front() == '#') {
             continue;
         }
@@ -112,7 +149,6 @@ void ProtocolParser::HandleLocalInput(const std::string& raw_input) {
 
     std::string command = ResolveCommandAlias(raw_command);
 
-    // Intercept local Help command without sending it over the network
     if (command == "Help") {
         PrintHelpMenu();
         return;
@@ -121,7 +157,6 @@ void ProtocolParser::HandleLocalInput(const std::string& raw_input) {
     std::string remaining_params;
     std::getline(iss >> std::ws, remaining_params);
 
-    // If the command is ServerAction, also resolve aliases for the nested <GameCommand>
     if (command == "ServerAction" && !remaining_params.empty()) {
         std::istringstream sa_iss(remaining_params);
         std::string sub_cmd, sub_rest;
@@ -215,30 +250,17 @@ void ProtocolParser::HandleServerMessage(const std::string& line) {
             message = message.substr(1, message.length() - 2);
         }
 
-        if (message.rfind("@SCREEN ", 0) == 0) {
-            std::string content = message.substr(8);
-            std::vector<std::string> lines;
-            std::istringstream stream(content);
-            std::string segment;
-            while (std::getline(stream, segment, '|')) {
-                size_t first = segment.find_first_not_of(" \t\r\n");
-                size_t last = segment.find_last_not_of(" \t\r\n");
-                if (first != std::string::npos && last != std::string::npos) {
-                    lines.push_back(segment.substr(first, last - first + 1));
-                } else {
-                    lines.push_back("");
+        // Dispatch '@' screen directives via the directive registry
+        if (!message.empty() && message.front() == '@') {
+            std::istringstream dir_iss(message);
+            std::string directive;
+            if (dir_iss >> directive) {
+                auto it = _screen_directives.find(directive);
+                if (it != _screen_directives.end()) {
+                    it->second(dir_iss);
+                    return;
                 }
             }
-            _state.SetCanvasLines(lines);
-            return;
-        } 
-        else if (message.rfind("@CLEAR", 0) == 0) {
-            _state.ClearCanvas();
-            return;
-        } 
-        else if (message.rfind("@ALERT ", 0) == 0) {
-            _state.SetAlert(message.substr(7));
-            return;
         }
 
         std::string formatted_tag = "[System]";

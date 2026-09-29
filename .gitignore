@@ -54,4 +54,3 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
-src/client/docs/ARCHITECTURE.md

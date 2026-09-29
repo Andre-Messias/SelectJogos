@@ -2,6 +2,8 @@
 
 #include <string>
 #include <unordered_map>
+#include <functional>
+#include <sstream>
 #include <cstdint>
 #include "client_state.hpp"
 #include "network_client.hpp"
@@ -9,6 +11,9 @@
 /// @brief Translates user text input into Lobby protocol requests and parses inbound server lines.
 class ProtocolParser {
     public:
+        /// @brief Callback type for handling @ screen directives inside LogChannel messages.
+        using DirectiveHandler = std::function<void(std::istringstream& iss)>;
+
         /// @brief Constructs a ProtocolParser linked to the client state and network interface.
         /// @param state Reference to the thread-safe client state model.
         /// @param network Reference to the TCP network client.
@@ -37,9 +42,14 @@ class ProtocolParser {
         uint32_t _msg_counter;
         /// @brief Maps lowercase full commands and shorthand aliases to their canonical case-sensitive protocol names.
         std::unordered_map<std::string, std::string> _command_aliases;
+        /// @brief Maps '@' visual directives (e.g., "@SCREEN", "@CLEAR") to their respective handler functions.
+        std::unordered_map<std::string, DirectiveHandler> _screen_directives;
 
         /// @brief Initializes the dictionary of case-insensitive command aliases and shorthands.
         void RegisterAliases();
+
+        /// @brief Initializes the registry of visual '@' screen directives.
+        void RegisterScreenDirectives();
 
         /// @brief Resolves a user-typed command token into its canonical protocol command name.
         /// @param input_cmd The raw command token typed by the user.
