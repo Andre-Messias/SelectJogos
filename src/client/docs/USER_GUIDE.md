@@ -7,7 +7,7 @@ The **Lobby Client** provides an interactive Terminal User Interface (TUI) for c
 ## 1. Launching the Client
 
 ### Using `make` (Recommended)
-From the `src/` directory, you can either launch both the Lobby Server and the Client together in a single terminal, or start only the Client to connect to an already running server:
+From the repository root (`SelectJogos/`) or from the `src/` directory, you can either launch both the Lobby Server and the Client together in a single terminal, or start only the Client to connect to an already running server:
 
 ```bash
 # Start Lobby Server in background + Launch TUI Client

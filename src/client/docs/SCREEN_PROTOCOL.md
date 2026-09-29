@@ -97,7 +97,7 @@ Because directives are transported inside `LogChannel <Target>`, games can choos
 | Target (`<Channel>`) | Use Case | Example |
 | :--- | :--- | :--- |
 | **`All`** | **Shared Public Board:** Chess, Checkers, Tic-Tac-Toe, or public scoreboards where every participant in the room sees the same state. | `LogChannel All "@SCREEN Score: 2 - 1 \| Round 4"` |
-| **`<ClientID>`** *(or `Id1-Id2`)* | **Asymmetric / Private View:** Card games, Battleship, or Higher/Lower where each player must see their own secret hand or status on the canvas. | `LogChannel 904028 "@SCREEN Your Secret Number: [ 500 ] \| Opponent: [ HIDDEN ]"` |
+| **`<IdList>`** *(e.g., `904028` or `904028,296846`)* | **Asymmetric / Private View:** Card games, Battleship, or Higher/Lower where each player or team must see their own secret hand or status on the canvas. | `LogChannel 904028 "@SCREEN Your Secret Number: [ 500 ] \| Opponent: [ HIDDEN ]"` |
 
 ---
 

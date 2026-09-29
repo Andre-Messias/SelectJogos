@@ -8,12 +8,12 @@ The Lobby acts as a reverse TCP proxy (`GameBridge`): it manages client connecti
 
 ## 1. Catalog Registration (`game.config`)
 
-To make a game available in the Lobby, add an entry to the `game.config` file in the server root directory. The system supports two execution modes:
+To make a game available in the Lobby, add an entry to the `game.config` file in the server root directory (`src/server/game.config`). The system supports two execution modes:
 
 ```ini
 # LOCAL Format:  
 # <GameName>    LOCAL            <ExecutablePath>
-HigherLower     LOCAL      ../game/build/template/game
+HigherLower     LOCAL      ../../games/template/build/game
 
 # REMOTE Format:
 # <GameName>       REMOTE    <IPAddress>   <Port>
@@ -200,6 +200,8 @@ sequenceDiagram
 
 ## 6. Minimal C++ Game Skeleton
 
-To start building a new compatible game without writing the networking boilerplate from scratch, use the base project available at:
+To start building a new compatible game without writing the networking boilerplate from scratch, use the base project and documentation available at:
 
-* **[Game Template (`games/template/src`)](../../../games/template/src)**
+* **[Game Template Overview (`games/template/README.md`)](../../../games/template/README.md)**
+* **[Game Template Architecture (`games/template/docs/ARCHITECTURE.md`)](../../../games/template/docs/ARCHITECTURE.md)**
+* **[Game Development Guide (`games/template/docs/GAME_DEVELOPMENT.md`)](../../../games/template/docs/GAME_DEVELOPMENT.md)**
