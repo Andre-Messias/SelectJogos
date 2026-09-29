@@ -1,0 +1,14 @@
+# Client Help File - Edit this file anytime without recompiling the code.
+--- AVAILABLE COMMANDS (Full Name | Shorthand) ---
+[Discovery]  ListGames (lg)                     - List available games
+[Discovery]  ListRooms (lr)                     - List active rooms
+[Room]       CreateRoom (cr) <Name> <Game> [Pw] - Create and join a room
+[Room]       JoinRoom (jr) <RoomID> [Pw]        - Join an existing room
+[Room]       LeaveRoom (lv)                     - Leave current room
+[Host Only]  StartGame (sg)                     - Start the match
+[Host Only]  StopGame (st)                      - Stop the running match
+[Host Only]  KickPlayer (kp) <ClientID>         - Kick a player from room
+[Host Only]  ServerAction (sa) <Cmd> [Args...]  - Admin action (e.g., 'sa rr')
+[In-Game]    PlayerAction (pa) <Args...>        - Send move to running game
+[Client]     Help (h, ?) | exit / quit          - Show help or close client
+--------------------------------------------------

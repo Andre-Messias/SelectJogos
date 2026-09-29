@@ -1,13 +1,102 @@
 #include "protocol_parser.hpp"
 #include <sstream>
+#include <fstream>
 #include <iostream>
 #include <algorithm>
+#include <cctype>
 
-ProtocolParser::ProtocolParser(ClientState& state, NetworkClient& network)
-    : _state(state), _network(network), _msg_counter(1) {}
+ProtocolParser::ProtocolParser(ClientState& state, NetworkClient& network, const std::string& help_filepath)
+    : _state(state), _network(network), _help_filepath(help_filepath), _msg_counter(1) {
+    RegisterAliases();
+}
+
+void ProtocolParser::RegisterAliases() {
+    // Local Client commands
+    _command_aliases["h"] = "Help";
+    _command_aliases["help"] = "Help";
+    _command_aliases["?"] = "Help";
+
+    // Discovery commands
+    _command_aliases["lg"] = "ListGames";
+    _command_aliases["listgames"] = "ListGames";
+    _command_aliases["lr"] = "ListRooms";
+    _command_aliases["listrooms"] = "ListRooms";
+
+    // Room management commands
+    _command_aliases["cr"] = "CreateRoom";
+    _command_aliases["createroom"] = "CreateRoom";
+    _command_aliases["jr"] = "JoinRoom";
+    _command_aliases["joinroom"] = "JoinRoom";
+    _command_aliases["lv"] = "LeaveRoom";
+    _command_aliases["leaveroom"] = "LeaveRoom";
+
+    // Host / Creator commands
+    _command_aliases["sg"] = "StartGame";
+    _command_aliases["startgame"] = "StartGame";
+    _command_aliases["st"] = "StopGame";
+    _command_aliases["stopgame"] = "StopGame";
+    _command_aliases["sa"] = "ServerAction";
+    _command_aliases["serveraction"] = "ServerAction";
+    _command_aliases["kp"] = "KickPlayer";
+    _command_aliases["kickplayer"] = "KickPlayer";
+
+    // Common In-Game and Admin commands
+    _command_aliases["pa"] = "PlayerAction";
+    _command_aliases["playeraction"] = "PlayerAction";
+    _command_aliases["rr"] = "ResetRound";
+    _command_aliases["resetround"] = "ResetRound";
+}
+
+std::string ProtocolParser::ResolveCommandAlias(const std::string& input_cmd) const {
+    std::string lower_cmd = input_cmd;
+    std::transform(lower_cmd.begin(), lower_cmd.end(), lower_cmd.begin(),
+        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+    auto it = _command_aliases.find(lower_cmd);
+    if (it != _command_aliases.end()) {
+        return it->second;
+    }
+    
+    return input_cmd;
+}
+
+void ProtocolParser::PrintHelpMenu() {
+    std::ifstream file(_help_filepath);
+    if (!file.is_open()) {
+        file.open("client/" + _help_filepath);
+    }
+    if (!file.is_open()) {
+        file.open("src/client/" + _help_filepath);
+    }
+
+    if (!file.is_open()) {
+        _state.SetAlert("[!] ERROR: Could not open help file '" + _help_filepath + "'");
+        _state.AddLog("[Error] Help file '" + _help_filepath + "' not found.");
+        return;
+    }
+
+    _state.ClearAlert();
+    std::string line;
+    while (std::getline(file, line)) {
+        if (!line.empty() && line.back() == '\r') {
+            line.pop_back();
+        }
+        // Skip empty lines or comment lines starting with '#'
+        if (line.empty() || line.front() == '#') {
+            continue;
+        }
+        _state.AddLog(line);
+    }
+}
 
 std::string ProtocolParser::GenerateMsgId() {
-    return "m" + std::to_string(_msg_counter++);
+    std::string id = "m" + std::to_string(_msg_counter);
+    if (_msg_counter >= MAX_MSG_COUNTER) {
+        _msg_counter = 1;
+    } else {
+        ++_msg_counter;
+    }
+    return id;
 }
 
 void ProtocolParser::HandleLocalInput(const std::string& raw_input) {
@@ -16,25 +105,46 @@ void ProtocolParser::HandleLocalInput(const std::string& raw_input) {
     }
 
     std::istringstream iss(raw_input);
-    std::string command;
-    iss >> command;
+    std::string raw_command;
+    if (!(iss >> raw_command)) {
+        return;
+    }
+
+    std::string command = ResolveCommandAlias(raw_command);
+
+    // Intercept local Help command without sending it over the network
+    if (command == "Help") {
+        PrintHelpMenu();
+        return;
+    }
 
     std::string remaining_params;
     std::getline(iss >> std::ws, remaining_params);
 
+    // If the command is ServerAction, also resolve aliases for the nested <GameCommand>
+    if (command == "ServerAction" && !remaining_params.empty()) {
+        std::istringstream sa_iss(remaining_params);
+        std::string sub_cmd, sub_rest;
+        if (sa_iss >> sub_cmd) {
+            std::getline(sa_iss >> std::ws, sub_rest);
+            remaining_params = ResolveCommandAlias(sub_cmd);
+            if (!sub_rest.empty()) {
+                remaining_params += " " + sub_rest;
+            }
+        }
+    }
+
     std::string msg_id = GenerateMsgId();
     SentCommand sent_cmd{command, "", ""};
 
-    // Track state transitions based on local commands
     if (command == "CreateRoom" || command == "JoinRoom") {
         std::istringstream param_iss(remaining_params);
-        param_iss >> sent_cmd.arg1; // RoomName or RoomID
-        param_iss >> sent_cmd.arg2; // GameName (if CreateRoom)
+        param_iss >> sent_cmd.arg1;
+        param_iss >> sent_cmd.arg2;
     }
 
     _state.RegisterSentCommand(msg_id, sent_cmd);
 
-    // Format and transmit to Lobby: <Command> <MsgID> [Parameters...][cite: 1]
     std::string payload = command + " " + msg_id;
     if (!remaining_params.empty()) {
         payload += " " + remaining_params;
@@ -50,7 +160,6 @@ void ProtocolParser::HandleServerMessage(const std::string& line) {
     iss >> prefix;
 
     if (prefix == "Response") {
-        // Format: Response <MsgID> <Success|Fail> [Data_or_Reason][cite: 1]
         std::string msg_id, result;
         iss >> msg_id >> result;
 
@@ -64,19 +173,18 @@ void ProtocolParser::HandleServerMessage(const std::string& line) {
             _state.ClearAlert();
             if (tracked) {
                 if (cmd.command == "CreateRoom") {
-                    // reason contains the generated RoomID[cite: 1]
                     int room_id = -1;
-                    try { room_id = std::stoi(reason); } catch(...) {}
+                    try { room_id = std::stoi(reason); } catch (...) {}
                     _state.EnterRoom(room_id, cmd.arg1, cmd.arg2);
-                    _state.AddLog("[Sistema] Sala '" + cmd.arg1 + "' criada com sucesso (ID: " + std::to_string(room_id) + ").");
+                    _state.AddLog("[System] Room '" + cmd.arg1 + "' created (ID: " + std::to_string(room_id) + ").");
                 } else if (cmd.command == "JoinRoom") {
                     int room_id = -1;
-                    try { room_id = std::stoi(cmd.arg1); } catch(...) {}
+                    try { room_id = std::stoi(cmd.arg1); } catch (...) {}
                     _state.EnterRoom(room_id, "", "");
-                    _state.AddLog("[Sistema] Você entrou na sala ID " + cmd.arg1 + ".");
+                    _state.AddLog("[System] Joined room ID " + cmd.arg1 + ".");
                 } else if (cmd.command == "LeaveRoom") {
                     _state.LeaveRoom();
-                    _state.AddLog("[Sistema] Você saiu da sala.");
+                    _state.AddLog("[System] Left the room.");
                 } else if (cmd.command == "StartGame") {
                     _state.SetScope(ClientScope::ROOM_PLAYING);
                 } else if (cmd.command == "StopGame") {
@@ -85,42 +193,41 @@ void ProtocolParser::HandleServerMessage(const std::string& line) {
                 }
             }
             if (!reason.empty() && cmd.command != "CreateRoom") {
-                _state.AddLog("[Resposta] " + reason);
+                _state.AddLog("[Response] " + reason);
             }
         } else {
-            // Failure response[cite: 1]
-            std::string err_msg = reason.empty() ? "Erro desconhecido" : reason;
-            // Remove surrounding quotes if present
-            if (err_msg.front() == '"' && err_msg.back() == '"') {
+            std::string err_msg = reason.empty() ? "Unknown error" : reason;
+            if (err_msg.size() >= 2 && err_msg.front() == '"' && err_msg.back() == '"') {
                 err_msg = err_msg.substr(1, err_msg.length() - 2);
             }
-            _state.SetAlert("[!] ERRO: " + err_msg);
-            _state.AddLog("[Erro] " + err_msg);
+            _state.SetAlert("[!] ERROR: " + err_msg);
+            _state.AddLog("[Error] " + err_msg);
         }
     } 
     else if (prefix == "LogChannel") {
-        // Format: LogChannel <Channel> "<Message>"[cite: 1, 2]
         std::string channel;
         iss >> channel;
 
         std::string message;
         std::getline(iss >> std::ws, message);
 
-        if (!message.empty() && message.front() == '"' && message.back() == '"') {
+        if (message.size() >= 2 && message.front() == '"' && message.back() == '"') {
             message = message.substr(1, message.length() - 2);
         }
 
-        // Handle optional custom game screen sub-protocol directives
         if (message.rfind("@SCREEN ", 0) == 0) {
             std::string content = message.substr(8);
             std::vector<std::string> lines;
             std::istringstream stream(content);
             std::string segment;
             while (std::getline(stream, segment, '|')) {
-                // Trim spaces
-                segment.erase(0, segment.find_first_not_of(" \t\r\n"));
-                segment.erase(segment.find_last_not_of(" \t\r\n") + 1);
-                lines.push_back(segment);
+                size_t first = segment.find_first_not_of(" \t\r\n");
+                size_t last = segment.find_last_not_of(" \t\r\n");
+                if (first != std::string::npos && last != std::string::npos) {
+                    lines.push_back(segment.substr(first, last - first + 1));
+                } else {
+                    lines.push_back("");
+                }
             }
             _state.SetCanvasLines(lines);
             return;
@@ -134,32 +241,37 @@ void ProtocolParser::HandleServerMessage(const std::string& line) {
             return;
         }
 
-        // Standard log formatting based on channel[cite: 1, 2]
-        std::string formatted_tag = "[Sistema]";
+        std::string formatted_tag = "[System]";
         if (channel == "All") {
-            formatted_tag = "[Jogo]";
+            formatted_tag = "[Game]";
+        } else if (channel != "0") {
+            formatted_tag = "[Private]";
+        } else {
             if (message.find("started in room") != std::string::npos) {
                 _state.SetScope(ClientScope::ROOM_PLAYING);
-            } else if (message.find("forcibly stopped") != std::string::npos || message.find("Game connection closed") != std::string::npos) {
+                formatted_tag = "[Room]";
+            } else if (message.find("forcibly stopped") != std::string::npos ||
+                       message.find("Game connection closed") != std::string::npos) {
                 _state.SetScope(ClientScope::ROOM_WAITING);
                 _state.ClearCanvas();
-            }
-        } else if (channel != "0") {
-            formatted_tag = "[Privado]";
-        } else {
-            if (message.find("joined the room") != std::string::npos || message.find("left the room") != std::string::npos) {
-                formatted_tag = "[Sala]";
+                formatted_tag = "[Room]";
+            } else if (message.find("You have been kicked") != std::string::npos) {
+                _state.LeaveRoom();
+                _state.SetAlert("[!] " + message);
+            } else if (message.find("joined the room") != std::string::npos ||
+                       message.find("left the room") != std::string::npos ||
+                       message.find("is now the room creator") != std::string::npos) {
+                formatted_tag = "[Room]";
             }
         }
 
-        // Extract ClientID on initial connection welcome message[cite: 7]
         if (channel == "0" && message.find("Connected with ClientID") != std::string::npos) {
             size_t pos = message.find("ClientID");
             if (pos != std::string::npos) {
                 try {
                     int cid = std::stoi(message.substr(pos + 9));
                     _state.SetClientId(cid);
-                } catch(...) {}
+                } catch (...) {}
             }
         }
 

@@ -4,6 +4,7 @@ FLAGS = -Wall -Wextra -std=c++17 -pthread -I$(INC_DIR) -I$(SRC_DIR) -I$(SRC_DIR)
 TARGET = client
 HOST ?= 127.0.0.1
 PORT ?= 8080
+HELP ?= help.txt
 
 INC_DIR = include
 SRC_DIR = src
@@ -16,7 +17,7 @@ OBJS = $(patsubst $(SRC_DIR)/%.cpp, $(OBJ_DIR)/%.o, $(SRCS))
 all: $(TARGET)
 
 run: all
-	./$(TARGET) $(HOST) $(PORT)
+	./$(TARGET) $(HOST) $(PORT) $(HELP)
 
 $(TARGET): $(OBJS)
 	$(COMPILER) $(FLAGS) -o $@ $^

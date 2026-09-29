@@ -1,6 +1,7 @@
 PORT ?= 8080
 HOST ?= 127.0.0.1
 CONFIG ?= game.config
+HELP ?= help.txt
 
 SERVER_DIR = server
 CLIENT_DIR = client
@@ -20,14 +21,14 @@ run: all
 	@cd $(SERVER_DIR) && ./lobby $(PORT) $(CONFIG) > lobby.log 2>&1 & \
 	SERVER_PID=$$!; \
 	sleep 0.3; \
-	$(MAKE) -s -C $(CLIENT_DIR) run HOST=$(HOST) PORT=$(PORT); \
+	$(MAKE) -s -C $(CLIENT_DIR) run HOST=$(HOST) PORT=$(PORT) HELP=$(HELP); \
 	kill $$SERVER_PID 2>/dev/null || true
 
 run-server:
 	$(MAKE) -C $(SERVER_DIR) run PORT=$(PORT) CONFIG=$(CONFIG)
 
 run-client:
-	$(MAKE) -C $(CLIENT_DIR) run HOST=$(HOST) PORT=$(PORT)
+	$(MAKE) -C $(CLIENT_DIR) run HOST=$(HOST) PORT=$(PORT) HELP=$(HELP)
 
 clean:
 	$(MAKE) -C $(SERVER_DIR) clean
