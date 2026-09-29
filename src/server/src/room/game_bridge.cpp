@@ -47,7 +47,24 @@ bool GameBridge::SpawnLocalProcess(int port) {
 void GameBridge::StopLocalProcess() {
     if (_game_pid > 0) {
         kill(_game_pid, SIGTERM);
-        waitpid(_game_pid, nullptr, 0);
+
+        bool exited = false;
+        for (int i = 0; i < 10; ++i) {
+            int status = 0;
+            pid_t result = waitpid(_game_pid, &status, WNOHANG);
+            if (result == _game_pid || result < 0) {
+                exited = true;
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        }
+
+        if (!exited) {
+            std::cerr << "[GameBridge] Process (PID: " << _game_pid << ") did not respond to SIGTERM, sending SIGKILL...\n";
+            kill(_game_pid, SIGKILL);
+            waitpid(_game_pid, nullptr, 0);
+        }
+
         std::cout << "[GameBridge] Terminated local game process (PID: " << _game_pid << ")\n";
         _game_pid = -1;
     }
@@ -55,6 +72,10 @@ void GameBridge::StopLocalProcess() {
 
 bool GameBridge::Connect(int allocated_port) {
     std::lock_guard<std::mutex> lock(_bridge_mutex);
+
+    if (_is_active.load()) {
+        return false;
+    }
 
     std::string connect_ip = _config.target;
     int connect_port = _config.port;
@@ -71,25 +92,24 @@ bool GameBridge::Connect(int allocated_port) {
     bool connected = false;
 
     for (int attempt = 0; attempt < max_attempts; ++attempt) {
-        _game_fd = socket(AF_INET, SOCK_STREAM, 0);
-        if (_game_fd < 0) break;
+        int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
+        if (sock_fd < 0) break;
 
         sockaddr_in game_addr{};
         game_addr.sin_family = AF_INET;
         game_addr.sin_port = htons(connect_port);
         if (inet_pton(AF_INET, connect_ip.c_str(), &game_addr.sin_addr) <= 0) {
-            close(_game_fd);
-            _game_fd = -1;
+            close(sock_fd);
             break;
         }
 
-        if (connect(_game_fd, (struct sockaddr*)&game_addr, sizeof(game_addr)) == 0) {
+        if (connect(sock_fd, (struct sockaddr*)&game_addr, sizeof(game_addr)) == 0) {
+            _game_fd.store(sock_fd);
             connected = true;
             break;
         }
 
-        close(_game_fd);
-        _game_fd = -1;
+        close(sock_fd);
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 
@@ -106,10 +126,10 @@ bool GameBridge::Disconnect() {
     std::lock_guard<std::mutex> lock(_bridge_mutex);
 
     bool was_active = _is_active.exchange(false);
-    if (_game_fd != -1) {
-        shutdown(_game_fd, SHUT_RDWR);
-        close(_game_fd);
-        _game_fd = -1;
+    int fd = _game_fd.exchange(-1);
+    if (fd != -1) {
+        shutdown(fd, SHUT_RDWR);
+        close(fd);
     }
     StopLocalProcess();
     return was_active;
@@ -117,13 +137,14 @@ bool GameBridge::Disconnect() {
 
 void GameBridge::Send(const std::string& payload) {
     std::lock_guard<std::mutex> lock(_bridge_mutex);
-    if (_is_active.load() && _game_fd != -1) {
-        NetworkUtils::SendMessage(_game_fd, payload);
+    int fd = _game_fd.load();
+    if (_is_active.load() && fd != -1) {
+        NetworkUtils::SendMessage(fd, payload);
     }
 }
 
 std::string GameBridge::ReadNextToken(std::string& buffer) {
-    int current_fd = _game_fd;
+    int current_fd = _game_fd.load();
     if (!_is_active.load() || current_fd == -1) {
         return "";
     }

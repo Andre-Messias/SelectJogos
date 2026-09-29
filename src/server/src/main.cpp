@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <csignal>
 
 #include "network_interface.hpp"
 
@@ -8,6 +9,8 @@ int main(int argc, char* argv[]) {
         std::cerr << "Usage: " << argv[0] << " <LOBBY_PORT> [CONFIG_FILE]\n";
         return 1;
     }
+
+    std::signal(SIGPIPE, SIG_IGN);
 
     int lobby_port = std::stoi(argv[1]);
     std::string config_file = (argc == 3) ? argv[2] : "game.config";

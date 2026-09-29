@@ -20,6 +20,8 @@ class GameBridge {
         /// @brief Gets the name of the game associated with this bridge.
         /// @return The name of the game.
         const std::string& GetGameName() const;
+
+        /// @brief Checks whether the connection to the game is currently active.
         bool IsActive() const { return _is_active.load(); }
 
         /// @brief Spawns the local binary (if LOCAL) and establishes the TCP connection to the Game.
@@ -38,10 +40,10 @@ class GameBridge {
     private:
         /// @brief The configuration for the game.
         GameConfig _config;
-        /// @brief The socket file descriptor for the TCP connection to the Game server; -1 if not connected.
+        /// @brief Indicates whether the TCP connection to the Game server is active.
         std::atomic<bool> _is_active;
         /// @brief The socket file descriptor for the TCP connection to the Game server; -1 if not connected.
-        int _game_fd;
+        std::atomic<int> _game_fd;
         /// @brief The process ID of the local game process if it was spawned by this bridge; -1 if no local process is running.
         pid_t _game_pid;
         /// @brief Mutex to protect access to the bridge's state, ensuring thread safety for connection management and communication.
@@ -52,6 +54,6 @@ class GameBridge {
         /// @return true if the process was successfully spawned, false otherwise.
         bool SpawnLocalProcess(int port);
         
-        /// @brief Terminates the local game process if it was spawned by this bridge.
+        /// @brief Terminates the local game process if it was spawned by this bridge, escalating to SIGKILL if unresponsive.
         void StopLocalProcess();
 };

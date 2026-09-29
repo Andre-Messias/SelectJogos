@@ -2,11 +2,21 @@
 
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <mutex>
 #include <memory>
+#include <atomic>
 
 #include "game_config.hpp"
 #include "game_bridge.hpp"
+
+/// @brief Tracks a client request awaiting a reply from the game process.
+struct PendingRequest {
+    /// @brief The ID of the client who originated the request.
+    int sender_id;
+    /// @brief The original message ID sent by the client before internal prefixing.
+    std::string original_msg_id;
+};
 
 /// @brief Represents a lobby room, managing connected players and routing messages through GameBridge.
 class GameRoom : public std::enable_shared_from_this<GameRoom> {
@@ -58,7 +68,7 @@ class GameRoom : public std::enable_shared_from_this<GameRoom> {
 
         /// @brief Gets the number of players in the room.
         /// @return The number of players in the room.
-        size_t GetPlayerCount();
+        size_t GetPlayerCount() const;
 
         /// @brief Checks if the room has the specified client.
         /// @param client_id The ID of the client to check.
@@ -72,7 +82,7 @@ class GameRoom : public std::enable_shared_from_this<GameRoom> {
 
         /// @brief Removes a client from the room.
         /// @param client_id The ID of the client to remove.
-        /// @return true if the client was removed, false otherwise.
+        /// @return true if the room creator changed as a result of the removal, false otherwise.
         bool RemoveClient(int client_id);
 
         /// @brief Starts the game in the room.
@@ -104,20 +114,39 @@ class GameRoom : public std::enable_shared_from_this<GameRoom> {
         /// @brief The password for the room, if any.
         std::string _password;
         /// @brief The ID of the user who created the room.
-        int _creator_id;
+        std::atomic<int> _creator_id;
+        /// @brief The current number of players connected to the room.
+        std::atomic<size_t> _player_count;
+        /// @brief Indicates whether a game start operation is currently in progress.
+        std::atomic<bool> _is_starting;
         /// @brief The GameBridge instance that manages the connection to the game process.
         GameBridge _bridge;
 
         /// @brief A mapping of client IDs to their corresponding socket file descriptors.
         std::unordered_map<int, int> _clients;
-        /// @brief A mapping of message IDs to the client IDs that are awaiting responses.
-        std::unordered_map<std::string, int> _pending_responses;
+        /// @brief Set of client IDs that were registered in the current match and subsequently left or disconnected.
+        std::unordered_set<int> _disconnected_clients;
+        /// @brief A mapping of internal message IDs to the pending client request metadata awaiting responses.
+        std::unordered_map<std::string, PendingRequest> _pending_responses;
         /// @brief Mutex to protect access to the room's state, ensuring thread safety for client management and game communication.
         std::mutex _room_mutex;
 
-        /// @brief Sends a client registration message to the game.
+        /// @brief Sends a client registration message (ConnectClient) to the game.
         /// @param client_id The ID of the client to register.
         void SendClientRegistration(int client_id);
+
+        /// @brief Sends a client disconnection message (DisconnectClient) to the game.
+        /// @param client_id The ID of the client that left the room.
+        void SendClientDisconnection(int client_id);
+
+        /// @brief Sends a client reconnection message (ReconnectClient) to the game.
+        /// @param client_id The ID of the client rejoining the active match.
+        void SendClientReconnection(int client_id);
+
+        /// @brief Routes a LogChannel message from the game to either all players or a specific IdList.
+        /// @param target The target specification ("All" or comma-separated client IDs).
+        /// @param raw_line The full newline-delimited message to deliver.
+        void RouteLogChannel(const std::string& target, const std::string& raw_line);
 
         /// @brief Listens for messages from the game and forwards them to the appropriate clients.
         void ListenToGame();

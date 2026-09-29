@@ -1,5 +1,6 @@
 #include "network_utils.hpp"
 
+#include <cerrno>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
@@ -8,28 +9,73 @@ int NetworkUtils::_next_local_port = NetworkUtils::MIN_LOCAL_PORT;
 std::mutex NetworkUtils::_port_mutex;
 
 void NetworkUtils::SendMessage(int socket_fd, const std::string& message) {
-    if (socket_fd != -1) {
-        write(socket_fd, message.c_str(), message.length());
+    if (socket_fd == -1 || message.empty()) {
+        return;
+    }
+
+    const char* data = message.c_str();
+    size_t total_sent = 0;
+    size_t length = message.length();
+
+    while (total_sent < length) {
+        ssize_t sent = send(socket_fd, data + total_sent, length - total_sent, MSG_NOSIGNAL);
+        if (sent < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+            break;
+        }
+        if (sent == 0) {
+            break;
+        }
+        total_sent += static_cast<size_t>(sent);
     }
 }
 
 std::string NetworkUtils::ReadToken(int socket_fd, std::string& buffer) {
-    size_t pos;
-    while ((pos = buffer.find('\n')) == std::string::npos) {
-        char temp[256];
-        ssize_t bytes_read = read(socket_fd, temp, sizeof(temp) - 1);
-        if (bytes_read <= 0) {
-            if (buffer.empty()) return "";
-            std::string last = buffer;
-            buffer.clear();
-            return last;
+    while (true) {
+        size_t pos;
+        while ((pos = buffer.find('\n')) == std::string::npos) {
+            if (buffer.size() >= MAX_BUFFER_SIZE) {
+                buffer.clear();
+                return "";
+            }
+
+            char temp[256];
+            ssize_t bytes_read = read(socket_fd, temp, sizeof(temp));
+            if (bytes_read < 0) {
+                if (errno == EINTR) {
+                    continue;
+                }
+                buffer.clear();
+                return "";
+            }
+            if (bytes_read == 0) {
+                if (buffer.empty()) {
+                    return "";
+                }
+                std::string last = buffer;
+                buffer.clear();
+                if (!last.empty() && last.back() == '\r') {
+                    last.pop_back();
+                }
+                return last;
+            }
+
+            buffer.append(temp, static_cast<size_t>(bytes_read));
         }
-        temp[bytes_read] = '\0';
-        buffer += temp;
+
+        std::string token = buffer.substr(0, pos);
+        buffer.erase(0, pos + 1);
+
+        if (!token.empty() && token.back() == '\r') {
+            token.pop_back();
+        }
+
+        if (!token.empty()) {
+            return token;
+        }
     }
-    std::string token = buffer.substr(0, pos);
-    buffer.erase(0, pos + 1);
-    return token;
 }
 
 int NetworkUtils::AllocateLocalPort(int reserved_port) {
