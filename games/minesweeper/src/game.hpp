@@ -75,6 +75,9 @@ private:
     /// @brief Finds a difficulty room by ID, or nullptr.
     Room *FindRoom(int room_id);
 
+    /// @brief Finds a player by ID, or nullptr.
+    Player *FindPlayer(int client_id);
+
     /// @brief Removes a player from their room (room_id = -1). Resets the room if nobody connected is left,
     /// otherwise redraws the screen for the remaining players. Caller sets the connection flag.
     void DetachPlayerFromRoom(Player &p, Server &server);

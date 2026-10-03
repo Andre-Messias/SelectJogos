@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include <csignal>
+#include <ctime>
 
 #include "server.hpp"
 #include "game.hpp"
@@ -19,6 +20,8 @@ int main(int argc, char *argv[])
 
     // Ignore SIGPIPE to prevent disconnected sockets from terminating the game process
     std::signal(SIGPIPE, SIG_IGN);
+
+    std::srand(std::time(nullptr));
 
     // Setup server and game
     int port = std::stoi(argv[1]);

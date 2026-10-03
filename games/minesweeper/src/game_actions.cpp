@@ -2,6 +2,7 @@
 #include "leaderboard.hpp"
 #include <iostream>
 #include <sstream>
+#include <algorithm>
 
 std::string Game::GetRoomPlayersString(int room_id)
 {
@@ -19,6 +20,16 @@ std::string Game::GetRoomPlayersString(int room_id)
     }
     out += " ]\n";
     return out;
+}
+
+Player *Game::FindPlayer(int client_id)
+{
+    for (auto &p : _players)
+    {
+        if (p.getId() == client_id)
+            return &p;
+    }
+    return nullptr;
 }
 
 Room *Game::FindRoom(int room_id)
@@ -54,30 +65,38 @@ void Game::BroadcastToRoom(int /*room_id*/, const std::string &message, Server &
 {
     std::string safe = message;
     bool is_screen = false;
-    
+
     // Check for our custom screen tag
-    if (safe.rfind("@SCREEN_TAG ", 0) == 0) { // starts with
+    if (safe.rfind("@SCREEN_TAG ", 0) == 0)
+    { // starts with
         is_screen = true;
         safe.erase(0, 12); // remove the tag
     }
-    
-    if (is_screen) {
+
+    if (is_screen)
+    {
         // Replace newlines with | for @SCREEN directive
         size_t pos;
-        while ((pos = safe.find("\n")) != std::string::npos) {
+        while ((pos = safe.find("\n")) != std::string::npos)
+        {
             safe.replace(pos, 1, "|");
         }
-        
+
         std::string packet = "LogChannel All \"@SCREEN " + safe + "\"\n";
         server.Broadcast(packet);
-    } else {
+    }
+    else
+    {
         // Send as regular line-by-line logs
         std::istringstream stream(safe);
         std::string line;
-        while (std::getline(stream, line)) {
-            if (line.empty() || line == "\r") continue;
-            if (line.back() == '\r') line.pop_back();
-            
+        while (std::getline(stream, line))
+        {
+            if (line.empty() || line == "\r")
+                continue;
+            if (line.back() == '\r')
+                line.pop_back();
+
             std::string packet = "LogChannel All \"" + line + "\"\n";
             server.Broadcast(packet);
         }
@@ -87,97 +106,75 @@ void Game::BroadcastToRoom(int /*room_id*/, const std::string &message, Server &
 void Game::HandleJoinRoom(int socket_fd, const std::string &msg_id, int client_id, std::istringstream &iss, Server &server)
 {
     int room_id;
-    if (!(iss >> room_id))
+    if (!(iss >> room_id) || room_id < 1 || room_id > 3)
     {
-        server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"Sala inválida\"\n");
+        server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"Sala inválida (use 1 a 3)\"\n");
         return;
     }
 
-    bool room_exists = false;
-    Room* target_room = nullptr;
-    for (auto &r : _rooms)
-    {
-        if (room_id == r.GetId())
-        {
-            room_exists = true;
-            target_room = &r;
-            break;
-        }
-    }
-
-    if (!room_exists)
-    {
-        server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"Sala não existe no servidor (1 a 6)\"\n");
-        return;
-    }
-
-    // Se a Lobby enviou como Admin (0), force todos os jogadores conectados a entrar nessa sala
     if (client_id == 0)
     {
-        _active_room_id = room_id; // Set the active difficulty for this server
-        for (auto &p : _players)
-        {
-            p.setRoomId(room_id);
-        }
-        
+        _active_room_id = room_id;
         server.SendMessage(socket_fd, "Response " + msg_id + " Success\n");
-        
-        std::string board_render = "@SCREEN_TAG " + GetRoomPlayersString(room_id);
-        board_render += "[ STATUS: LOBBY (Digite 'sa StartGame' para começar) ]\n\n";
-        board_render += target_room->GetBoard().Render();
-        BroadcastToRoom(room_id, board_render, server);
+        Room *r = FindRoom(room_id);
+        if (r) {
+            std::string board_render = "@SCREEN_TAG ";
+            board_render += GetRoomPlayersString(r->GetId());
+            if (r->GetState() == RoomState::NAMING)
+                board_render += "[ STATUS: VITÓRIA! AGUARDANDO NOME DA EQUIPE (!name <nome>) ]\n\n";
+            else
+                board_render += "[ STATUS: LOBBY (Digite '!start' para começar) ]\n\n";
+            board_render += r->GetBoard().Render();
+            BroadcastToRoom(room_id, board_render, server);
+        }
         return;
     }
 
-    // Fluxo normal para client_id específico
-    Player *current_player = nullptr;
-    int num_players_in_room = 0;
-
-    for (auto &p : _players)
-    {
-        if (p.getId() == client_id)
-        {
-            current_player = &p;
-            p.updateActivity();
-        }
-
-        if (p.getRoomId() == room_id)
-        {
-            num_players_in_room++;
-        }
-    }
-
+    Player *current_player = FindPlayer(client_id);
     if (!current_player)
     {
         server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"Jogador não encontrado\"\n");
         return;
     }
 
-    if (num_players_in_room >= target_room->GetMaxPlayers())
+    if (current_player->getRoomId() == room_id)
+    {
+        server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"Você já está nesta sala\"\n");
+        return;
+    }
+
+    Room *r = FindRoom(room_id);
+    if (!r)
+    {
+        server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"Sala não encontrada\"\n");
+        return;
+    }
+
+    if (r->GetState() != RoomState::LOBBY)
+    {
+        server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"Jogo em andamento\"\n");
+        return;
+    }
+
+    int current_players = 0;
+    for (const auto &p : _players)
+    {
+        if (p.getRoomId() == room_id && p.isConnected())
+            current_players++;
+    }
+
+    if (current_players >= r->GetMaxPlayers())
     {
         server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"Sala cheia\"\n");
         return;
     }
 
     current_player->setRoomId(room_id);
-    _active_room_id = room_id;
-    server.SendMessage(socket_fd, "Response " + msg_id + " Success\n");
+    current_player->updateActivity();
 
-    std::string board_render = "@SCREEN_TAG " + GetRoomPlayersString(room_id);
-    if (target_room->GetState() == RoomState::LOBBY)
-    {
-        board_render += "[ STATUS: LOBBY (Digite 'sa StartGame' para começar) ]\n\n";
-    }
-    else if (target_room->GetState() == RoomState::NAMING)
-    {
-        board_render += "[ STATUS: AGUARDANDO NOME DA EQUIPE ]\n\n";
-    }
-    else
-    {
-        board_render += "[ STATUS: JOGANDO ]\n\n";
-    }
-    board_render += target_room->GetBoard().Render();
-    BroadcastToRoom(room_id, board_render, server);
+    server.SendMessage(socket_fd, "Response " + msg_id + " Success\n");
+    BroadcastToRoom(room_id, "O jogador " + current_player->getName() + " entrou na sala!\n", server);
+    BroadcastRoomScreen(*r, server);
 }
 
 void Game::HandlePlayerAction(int socket_fd, const std::string &msg_id, int client_id, std::istringstream &iss, Server &server)
@@ -190,275 +187,177 @@ void Game::HandlePlayerAction(int socket_fd, const std::string &msg_id, int clie
         return;
     }
 
-    for (auto &p : _players)
+    Player *p = FindPlayer(client_id);
+    if (!p)
     {
-        if (p.getId() == client_id)
+        server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"Jogador não encontrado\"\n");
+        return;
+    }
+
+    if (p->getRoomId() == -1)
+    {
+        server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"Entre em uma sala primeiro\"\n");
+        return;
+    }
+
+    p->updateActivity();
+
+    Room *r = FindRoom(p->getRoomId());
+    if (!r)
+    {
+        server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"Sala não encontrada\"\n");
+        return;
+    }
+
+    if (r->GetState() != RoomState::PLAYING)
+    {
+        server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"A partida ainda não começou ou já terminou.\"\n");
+        return;
+    }
+
+    MoveInput parsed_move;
+    if (!ParseInput(move, r->GetBoard().Size(), parsed_move))
+    {
+        server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"Jogada inválida\"\n");
+        return;
+    }
+
+    if (parsed_move.action == MoveInput::FLAG)
+    {
+        r->GetBoard().SetFlag(parsed_move.row, parsed_move.col, true);
+    }
+    else if (parsed_move.action == MoveInput::UNFLAG)
+    {
+        r->GetBoard().SetFlag(parsed_move.row, parsed_move.col, false);
+    }
+    else
+    {
+        if (!r->GetBoard().IsGenerated())
         {
-            if (p.getRoomId() == -1)
-            {
-                server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"Entre em uma sala primeiro\"\n");
-                return;
-            }
-
-            p.updateActivity();
-
-            for (auto &r : _rooms)
-            {
-                if (r.GetId() == p.getRoomId())
-                {
-                    if (r.GetState() != RoomState::PLAYING)
-                    {
-                        server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"A partida ainda não começou ou já terminou.\"\n");
-                        return;
-                    }
-
-                    MoveInput parsed_move;
-
-                    if (!ParseInput(move, r.GetBoard().Size(), parsed_move))
-                    {
-                        server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"Jogada inválida\"\n");
-                        return;
-                    }
-
-                    if (parsed_move.action == MoveInput::FLAG)
-                    {
-                        r.GetBoard().SetFlag(parsed_move.row, parsed_move.col, true);
-                    }
-                    else if (parsed_move.action == MoveInput::UNFLAG)
-                    {
-                        r.GetBoard().SetFlag(parsed_move.row, parsed_move.col, false);
-                    }
-                    else
-                    {
-                        // Gerar o campo na primeira jogada, garantindo área segura
-                        if (!r.GetBoard().IsGenerated())
-                        {
-                            r.GetBoard().Generate(parsed_move.row, parsed_move.col);
-                            r.RecordFirstClick();
-                        }
-
-                        bool hit_bomb = r.GetBoard().Reveal(parsed_move.row, parsed_move.col);
-                        if (hit_bomb)
-                        {
-                            int penalty = (r.GetId() == 1) ? 15 : ((r.GetId() == 2) ? 20 : 30);
-                            r.AddPenalty(penalty);
-                            server.SendMessage(socket_fd, "BOOM! Penalidade de tempo adicionada!\n");
-                        }
-                    }
-
-                    server.SendMessage(socket_fd, "Response " + msg_id + " Success\n");
-
-                    // Checa condição de vitória ANTES do render final
-                    if (r.GetBoard().IsComplete())
-                    {
-                        auto now = std::chrono::steady_clock::now();
-                        int elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - r.GetStartTime()).count();
-                        r.SetWon(elapsed); // Guarda o tempo e atualiza estado
-                    }
-
-                    // Limpa a tela e reenvia o tabuleiro pra todos na sala
-                    std::string board_render = "@SCREEN_TAG ";
-                    board_render += GetRoomPlayersString(r.GetId());
-                    if (r.GetState() == RoomState::NAMING)
-                    {
-                        board_render += "[ STATUS: VITÓRIA! AGUARDANDO NOME DA EQUIPE (!name <nome>) ]\n\n";
-                    }
-                    else
-                    {
-                        board_render += "[ STATUS: JOGANDO ]\n\n";
-                    }
-                    board_render += r.GetBoard().Render();
-
-                    BroadcastToRoom(r.GetId(), board_render, server);
-
-                    if (r.GetState() == RoomState::NAMING)
-                    {
-                        std::string win_msg = "\nPARABÉNS! Campo limpo em " + std::to_string(r.GetPenaltySeconds()) + "s.\nO jogador que criou a sala deve digitar '!name <nome_da_equipe>' para salvar o recorde!\n";
-                        BroadcastToRoom(r.GetId(), win_msg, server);
-                    }
-
-                    return;
-                }
-            }
+            r->GetBoard().Generate(parsed_move.row, parsed_move.col);
+            r->RecordFirstClick();
         }
+
+        bool hit_bomb = r->GetBoard().Reveal(parsed_move.row, parsed_move.col);
+        if (hit_bomb)
+        {
+            int penalty = (r->GetId() == 1) ? 15 : ((r->GetId() == 2) ? 20 : 30);
+            r->AddPenalty(penalty);
+            server.SendMessage(socket_fd, "BOOM! Penalidade de tempo adicionada!\n");
+        }
+    }
+
+    server.SendMessage(socket_fd, "Response " + msg_id + " Success\n");
+
+    if (r->GetBoard().IsComplete())
+    {
+        auto now = std::chrono::steady_clock::now();
+        int elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - r->GetStartTime()).count();
+        r->SetWon(elapsed);
+    }
+
+    BroadcastRoomScreen(*r, server);
+
+    if (r->GetState() == RoomState::NAMING)
+    {
+        std::string win_msg = "\nPARABÉNS! Campo limpo em " + std::to_string(r->GetPenaltySeconds()) + "s.\nO jogador que criou a sala deve digitar '!name <nome_da_equipe>' para salvar o recorde!\n";
+        BroadcastToRoom(r->GetId(), win_msg, server);
     }
 }
 
 void Game::HandleStartGame(int socket_fd, const std::string &msg_id, int client_id, std::istringstream & /*iss*/, Server &server)
 {
-    // Se a Lobby enviou como Admin (0), force o início da sala ativa
     if (client_id == 0)
     {
-        for (auto &r : _rooms)
-        {
-            if (r.GetId() == _active_room_id)
-            {
-                if (r.GetState() != RoomState::LOBBY)
-                {
-                    server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"A sala já está em andamento.\"\n");
-                    return;
-                }
-                r.Start();
-                server.SendMessage(socket_fd, "Response " + msg_id + " Success\n");
-
-                std::string board_render = "@SCREEN_TAG " + GetRoomPlayersString(r.GetId());
-                board_render += "[ STATUS: JOGANDO ]\n\n";
-                board_render += r.GetBoard().Render();
-                BroadcastToRoom(r.GetId(), board_render, server);
-                return;
-            }
+        Room *r = FindRoom(_active_room_id);
+        if (r) {
+            r->Start();
+            server.SendMessage(socket_fd, "Response " + msg_id + " Success\n");
+            BroadcastToRoom(r->GetId(), "A partida começou! Boa sorte!\n", server);
+            BroadcastRoomScreen(*r, server);
         }
+        return;
     }
 
-    for (auto &p : _players)
+    Player *p = FindPlayer(client_id);
+    if (!p || p->getRoomId() == -1)
     {
-        if (p.getId() == client_id && p.getRoomId() != -1)
-        {
-            p.updateActivity();
-            for (auto &r : _rooms)
-            {
-                if (r.GetId() == p.getRoomId())
-                {
-                    if (r.GetState() != RoomState::LOBBY)
-                    {
-                        server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"A sala já está em andamento.\"\n");
-                        return;
-                    }
-                    r.Start();
-                    server.SendMessage(socket_fd, "Response " + msg_id + " Success\n");
-
-                    std::string board_render = "@SCREEN_TAG ";
-                    board_render += GetRoomPlayersString(r.GetId());
-                    board_render += "[ STATUS: JOGANDO ]\n\n";
-                    board_render += r.GetBoard().Render();
-                    BroadcastToRoom(r.GetId(), board_render, server);
-                    return;
-                }
-            }
-        }
+        server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"Entre em uma sala primeiro\"\n");
+        return;
     }
-    server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"Você não está em uma sala.\"\n");
+
+    Room *r = FindRoom(p->getRoomId());
+    if (!r) return;
+
+    if (r->GetState() != RoomState::LOBBY)
+    {
+        server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"A partida já começou\"\n");
+        return;
+    }
+
+    r->Start();
+    server.SendMessage(socket_fd, "Response " + msg_id + " Success\n");
+    BroadcastToRoom(r->GetId(), "A partida começou! Boa sorte!\n", server);
+    BroadcastRoomScreen(*r, server);
 }
 
 void Game::HandleNameTeam(int socket_fd, const std::string &msg_id, int client_id, std::istringstream &iss, Server &server)
 {
     std::string team_name;
-    if (!(iss >> team_name))
+    std::getline(iss >> std::ws, team_name);
+    if (team_name.empty())
     {
-        server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"Nome da equipe vazio.\"\n");
+        server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"Nome da equipe não pode ser vazio\"\n");
+        return;
+    }
+    std::replace(team_name.begin(), team_name.end(), ' ', '_');
+
+    Room *r = nullptr;
+
+    if (client_id == 0)
+    {
+        r = FindRoom(_active_room_id);
+    }
+    else
+    {
+        Player *p = FindPlayer(client_id);
+        if (!p)
+        {
+            server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"Jogador não encontrado\"\n");
+            return;
+        }
+
+        if (p->getRoomId() == -1)
+        {
+            server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"Entre em uma sala primeiro\"\n");
+            return;
+        }
+        r = FindRoom(p->getRoomId());
+    }
+
+    if (!r) return;
+
+    if (r->GetState() != RoomState::NAMING)
+    {
+        server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"O jogo não está aguardando um nome\"\n");
         return;
     }
 
-    // Se a Lobby enviou como Admin (0), aplique à sala ativa
-    if (client_id == 0)
-    {
-        for (auto &r : _rooms)
-        {
-            if (r.GetId() == _active_room_id)
-            {
-                if (r.GetState() != RoomState::NAMING)
-                {
-                    server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"A sala não está aguardando nome.\"\n");
-                    return;
-                }
-
-                int player_count = 0;
-                std::vector<std::string> team_names;
-                for (auto &other : _players)
-                {
-                    if (other.isConnected() && other.getRoomId() == _active_room_id)
-                    {
-                        player_count++;
-                        team_names.push_back(other.getName());
-                    }
-                }
-
-                Leaderboard::SaveTeamScore(r.GetStatsFile(), team_names, r.GetPenaltySeconds(), player_count, team_name);
-
-                server.SendMessage(socket_fd, "Response " + msg_id + " Success\n");
-                BroadcastToRoom(_active_room_id, "\nRecorde salvo para a equipe '" + team_name + "'!\nVoltando ao LOBBY...\n", server);
-
-                std::this_thread::sleep_for(std::chrono::seconds(2));
-
-                r.Reset();
-
-                std::string board_render = "@SCREEN_TAG ";
-                board_render += GetRoomPlayersString(r.GetId());
-                board_render += "[ STATUS: LOBBY (Digite '!start' para começar) ]\n\n";
-                board_render += r.GetBoard().Render();
-                BroadcastToRoom(r.GetId(), board_render, server);
-                return;
-            }
+    server.SendMessage(socket_fd, "Response " + msg_id + " Success\n");
+    
+    std::vector<std::string> team_members;
+    for (const auto &p_check : _players) {
+        if (p_check.getRoomId() == r->GetId() && p_check.isConnected()) {
+            team_members.push_back(p_check.getName());
         }
     }
 
-    for (auto &p : _players)
-    {
-        if (p.getId() == client_id && p.getRoomId() != -1)
-        {
-            p.updateActivity();
-            int room_id = p.getRoomId();
-            for (auto &r : _rooms)
-            {
-                if (r.GetId() == room_id)
-                {
-                    if (r.GetState() != RoomState::NAMING)
-                    {
-                        server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"A sala não está aguardando nome.\"\n");
-                        return;
-                    }
-
-                    // Check if p is host (first connected player in this room)
-                    int host_id = -1;
-                    std::string host_name;
-                    int player_count = 0;
-                    for (auto &other : _players)
-                    {
-                        if (other.isConnected() && other.getRoomId() == room_id)
-                        {
-                            player_count++;
-                            if (host_id == -1)
-                            {
-                                host_id = other.getId();
-                                host_name = other.getName();
-                            }
-                        }
-                    }
-
-                    if (client_id != host_id)
-                    {
-                        server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"Apenas o líder (" + host_name + ") pode nomear a equipe.\"\n");
-                        return;
-                    }
-
-                    // Save stats
-                    std::vector<std::string> team_names;
-                    for (auto &other : _players)
-                    {
-                        if (other.isConnected() && other.getRoomId() == room_id)
-                        {
-                            team_names.push_back(other.getName());
-                        }
-                    }
-                    Leaderboard::SaveTeamScore(r.GetStatsFile(), team_names, r.GetPenaltySeconds(), player_count, team_name);
-
-                    server.SendMessage(socket_fd, "Response " + msg_id + " Success\n");
-                    BroadcastToRoom(room_id, "\nRecorde salvo para a equipe '" + team_name + "'!\nVoltando ao LOBBY...\n", server);
-
-                    std::this_thread::sleep_for(std::chrono::seconds(2));
-
-                    r.Reset();
-
-                    std::string board_render = "@SCREEN_TAG ";
-                    board_render += GetRoomPlayersString(r.GetId());
-                    board_render += "[ STATUS: LOBBY (Digite '!start' para começar) ]\n\n";
-                    board_render += r.GetBoard().Render();
-                    BroadcastToRoom(r.GetId(), board_render, server);
-                    return;
-                }
-            }
-        }
-    }
+    Leaderboard::SaveTeamScore(r->GetStatsFile(), team_members, r->GetPenaltySeconds(), team_members.size(), team_name);
+    
+    BroadcastToRoom(r->GetId(), "\nRecorde salvo para a equipe '" + team_name + "'!\nVoltando ao LOBBY...\n", server);
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+    r->Reset();
+    BroadcastRoomScreen(*r, server);
 }
 
 void Game::HandleRanking(int socket_fd, const std::string &msg_id, int /*client_id*/, std::istringstream &iss, Server &server)
