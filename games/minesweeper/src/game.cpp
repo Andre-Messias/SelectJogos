@@ -17,12 +17,9 @@ Game::~Game()
 
 void Game::InitRooms()
 {
-    _rooms.emplace_back(1, 9, 10, 4, "stats_easy.txt");
-    _rooms.emplace_back(2, 9, 10, 4, "stats_easy.txt");
-    _rooms.emplace_back(3, 16, 40, 4, "stats_medium.txt");
-    _rooms.emplace_back(4, 16, 40, 4, "stats_medium.txt");
-    _rooms.emplace_back(5, 30, 99, 4, "stats_hard.txt");
-    _rooms.emplace_back(6, 30, 99, 4, "stats_hard.txt");
+    _rooms.emplace_back(1, 10, 10, 4, "stats_easy.txt");   // 1 = Easy
+    _rooms.emplace_back(2, 16, 40, 4, "stats_medium.txt"); // 2 = Medium
+    _rooms.emplace_back(3, 24, 99, 4, "stats_hard.txt");   // 3 = Hard
 }
 
 void Game::Start(Server& server)
@@ -62,7 +59,8 @@ void Game::ProcessMessage(int socket_fd, const std::string &message, Server &ser
     }
     else
     {
-        server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"Comando desconhecido\"\n");
+        // Silently ignore unknown Lobby commands so they don't spam the UI
+        server.SendMessage(socket_fd, "Response " + msg_id + " Success\n");
     }
 }
 

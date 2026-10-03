@@ -58,4 +58,6 @@ Testing/
 
 # minhas coisas
 todo list
-minesweeper cpy
+games/minesweeper/build/
+games/minesweeper/objs/
+games/minesweeper/stats_*.txt

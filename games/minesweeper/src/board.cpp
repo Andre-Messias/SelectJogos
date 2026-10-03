@@ -186,55 +186,36 @@ bool Board::IsComplete() const {
     6=ciano, 7=branco, 8=cinza
 */
 string Board::Render() const {
-    char buf[64];
-    string out;
-
-    // Cabeçalho com números das colunas
-    out += "\n    ";
+    string out = "\n    ";
+    
+    // Header
     for (int c = 0; c < _size; c++) {
-        snprintf(buf, sizeof(buf), " %2d ", c);
-        out += buf;
+        if (c < 10) out += " " + to_string(c) + " ";
+        else out += to_string(c) + " ";
     }
     out += "\n";
 
     for (int r = 0; r < _size; r++) {
-        // Borda superior da linha
-        out += "    ";
-        for (int c = 0; c < _size; c++) {
-            out += "+---";
-        }
-        out += "+\n";
-
-        // Letra da linha + conteúdo das células
-        snprintf(buf, sizeof(buf), " %c  ", COORDS[r]);
-        out += buf;
-
+        out += " " + string(1, COORDS[r]) + " ";
         for (int c = 0; c < _size; c++) {
             const Cell& cell = _grid[r][c];
-
             if (cell.flagged && !cell.revealed) {
-                out += "|\033[1;31m ⚑ \033[0m";
+                out += "[\033[1;31m⚑\033[0m]";
             }
             else if (!cell.revealed) {
-                out += "|\033[1m X \033[0m";
+                out += "[\033[1mX\033[0m]";
             }
             else if (cell.type == 0) {
-                out += "|   ";
+                out += "[ ]";
             }
             else {
-                snprintf(buf, sizeof(buf), "|\033[%dm %d \033[0m", cell.type + 30, cell.type);
+                char buf[32];
+                snprintf(buf, sizeof(buf), "[\033[%dm%d\033[0m]", cell.type + 30, cell.type);
                 out += buf;
             }
         }
-        out += "|\n";
+        out += "\n";
     }
-
-    // Borda inferior final
-    out += "    ";
-    for (int c = 0; c < _size; c++) {
-        out += "+---";
-    }
-    out += "+\n";
 
     return out;
 }

@@ -19,6 +19,26 @@ namespace {
         }
         return out;
     }
+
+    /// @brief Calculates the visible length of a string, ignoring ANSI colors and UTF-8 continuation bytes.
+    size_t VisibleLength(const std::string& str) {
+        size_t len = 0;
+        bool in_ansi = false;
+        for (size_t i = 0; i < str.length(); ++i) {
+            unsigned char c = str[i];
+            if (c == '\033') {
+                in_ansi = true;
+            } else if (in_ansi && c == 'm') {
+                in_ansi = false;
+            } else if (!in_ansi) {
+                // Count only characters that are not UTF-8 continuation bytes (10xxxxxx)
+                if ((c & 0xC0) != 0x80) {
+                    len++;
+                }
+            }
+        }
+        return len;
+    }
 }
 
 TerminalUI::TerminalUI(ClientState& state)
@@ -138,12 +158,21 @@ void TerminalUI::Render() {
     // 2. Canvas Area (Game Screen / Board) if active
     if (has_canvas) {
         ss << "┌" << RepeatUTF8(term_cols - 2, "─") << "┐\r\n";
+        
+        // Find the max visible length to center the block as a whole
+        int max_vlen = 0;
         for (const auto& cline : snap.canvas_lines) {
-            std::string padded = cline;
-            if (static_cast<int>(padded.length()) < term_cols - 4) {
-                padded += std::string(static_cast<size_t>(term_cols - 4 - static_cast<int>(padded.length())), ' ');
-            }
-            ss << "│ " << padded.substr(0, static_cast<size_t>(term_cols - 4)) << " │\r\n";
+            int vlen = static_cast<int>(VisibleLength(cline));
+            if (vlen > max_vlen) max_vlen = vlen;
+        }
+        int available = term_cols - 2;
+        int global_pad = 0;
+        if (max_vlen < available) {
+            global_pad = (available - max_vlen) / 2;
+        }
+
+        for (const auto& cline : snap.canvas_lines) {
+            ss << "│" << std::string(static_cast<size_t>(global_pad), ' ') << cline << "\033[K\033[" << term_cols << "G│\r\n";
         }
         ss << "└" << RepeatUTF8(term_cols - 2, "─") << "┘\r\n";
     }

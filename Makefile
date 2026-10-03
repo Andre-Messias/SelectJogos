@@ -4,7 +4,9 @@ CONFIG ?= game.config
 HELP ?= help.txt
 
 SRC_DIR = src
-TEMPLATE_GAME_DIR = games/template
+
+# List all active games here
+GAMES_LIST = template minesweeper
 
 all: games src
 
@@ -12,9 +14,11 @@ all: games src
 src:
 	$(MAKE) -C $(SRC_DIR) all
 
-# Compiles the game template (and can be extended to other games)
+# Compiles all games in the GAMES_LIST
 games:
-	$(MAKE) -C $(TEMPLATE_GAME_DIR) all
+	@for game in $(GAMES_LIST); do \
+		$(MAKE) -C games/$$game all; \
+	done
 
 server:
 	$(MAKE) -C $(SRC_DIR) server
@@ -29,11 +33,16 @@ run: all
 run-server: games server
 	$(MAKE) -C $(SRC_DIR) run-server PORT=$(PORT) CONFIG=$(CONFIG)
 
+stop-server:
+	$(MAKE) -C $(SRC_DIR) stop-server PORT=$(PORT)
+
 run-client: client
 	$(MAKE) -C $(SRC_DIR) run-client HOST=$(HOST) PORT=$(PORT) HELP=$(HELP)
 
 clean:
 	$(MAKE) -C $(SRC_DIR) clean
-	$(MAKE) -C $(TEMPLATE_GAME_DIR) clean
+	@for game in $(GAMES_LIST); do \
+		$(MAKE) -C games/$$game clean; \
+	done
 
-.PHONY: all src games server client run run-server run-client clean
+.PHONY: all src games server client run run-server stop-server run-client clean

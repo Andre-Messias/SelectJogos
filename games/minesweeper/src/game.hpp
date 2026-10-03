@@ -43,6 +43,7 @@ private:
     /// @brief Mutex to protect the game state, ensuring thread safety when processing messages and updating player data.
     std::mutex _game_mutex;
 
+    int _active_room_id = 1;
     std::vector<Room> _rooms;
 
     void InitRooms();
