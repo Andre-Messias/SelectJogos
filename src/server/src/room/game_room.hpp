@@ -85,6 +85,11 @@ class GameRoom : public std::enable_shared_from_this<GameRoom> {
         /// @return true if the room creator changed as a result of the removal, false otherwise.
         bool RemoveClient(int client_id);
 
+        /// @brief Records a display nickname for a client and, if a game is running, forwards it (SetPlayerName).
+        /// @param client_id The ID of the client.
+        /// @param name The validated nickname (no whitespace or quotes).
+        void SetClientName(int client_id, const std::string& name);
+
         /// @brief Starts the game in the room.
         /// @param allocated_port The port allocated for the game.
         /// @return true if the game started successfully, false otherwise.
@@ -126,6 +131,8 @@ class GameRoom : public std::enable_shared_from_this<GameRoom> {
         std::unordered_map<int, int> _clients;
         /// @brief Set of client IDs that were registered in the current match and subsequently left or disconnected.
         std::unordered_set<int> _disconnected_clients;
+        /// @brief A mapping of client IDs to their display nicknames (only for clients that set one).
+        std::unordered_map<int, std::string> _client_names;
         /// @brief A mapping of internal message IDs to the pending client request metadata awaiting responses.
         std::unordered_map<std::string, PendingRequest> _pending_responses;
         /// @brief Mutex to protect access to the room's state, ensuring thread safety for client management and game communication.

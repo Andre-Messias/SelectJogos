@@ -1,6 +1,7 @@
 #include "network_interface.hpp"
 #include "network_utils.hpp"
 
+#include <cctype>
 #include <iostream>
 #include <thread>
 #include <sys/socket.h>
@@ -74,6 +75,7 @@ void NetworkInterface::HandleClient(int client_fd, int client_id) {
     {
         std::lock_guard<std::mutex> lock(_clients_mutex);
         _client_sockets.erase(client_id);
+        _client_usernames.erase(client_id);
     }
 
     _room_manager.RemoveClientFromRoom(client_id);
@@ -116,6 +118,7 @@ void NetworkInterface::ProcessMessage(int client_id, int socket_fd, const std::s
 void NetworkInterface::RegisterCommands() {
     _command_registry["ListGames"] = [this](CommandContext& ctx) { HandleListGames(ctx); };
     _command_registry["ListRooms"] = [this](CommandContext& ctx) { HandleListRooms(ctx); };
+    _command_registry["SetNick"] = [this](CommandContext& ctx) { HandleSetNick(ctx); };
     _command_registry["CreateRoom"] = [this](CommandContext& ctx) { HandleCreateRoom(ctx); };
     _command_registry["JoinRoom"] = [this](CommandContext& ctx) { HandleJoinRoom(ctx); };
     _command_registry["LeaveRoom"] = [this](CommandContext& ctx) { HandleLeaveRoom(ctx); };
@@ -135,6 +138,61 @@ void NetworkInterface::HandleListRooms(CommandContext& ctx) {
     NetworkUtils::SendMessage(ctx.socket_fd, response);
 }
 
+/// @brief Nicknames travel inside space-separated protocol lines and quoted LogChannel
+/// payloads, so only a conservative ASCII charset is accepted.
+static bool IsValidNickname(const std::string& nick) {
+    if (nick.empty() || nick.size() > MAX_NICKNAME_LENGTH) {
+        return false;
+    }
+    for (unsigned char c : nick) {
+        if (!(std::isalnum(c) || c == '_' || c == '-' || c == '.')) {
+            return false;
+        }
+    }
+    return true;
+}
+
+std::string NetworkInterface::GetNickname(int client_id) {
+    std::lock_guard<std::mutex> lock(_clients_mutex);
+    auto it = _client_usernames.find(client_id);
+    return (it != _client_usernames.end()) ? it->second : "";
+}
+
+void NetworkInterface::HandleSetNick(CommandContext& ctx) {
+    std::string new_nick;
+    if (!(ctx.iss >> new_nick)) {
+        NetworkUtils::SendMessage(ctx.socket_fd, "Response " + ctx.msg_id + " Fail \"Usage: SetNick <MsgID> <Nickname>\"\n");
+        return;
+    }
+
+    if (!IsValidNickname(new_nick)) {
+        NetworkUtils::SendMessage(ctx.socket_fd, "Response " + ctx.msg_id + " Fail \"Nickname must be 1-" +
+            std::to_string(MAX_NICKNAME_LENGTH) + " chars of letters, digits, '_', '-' or '.'\"\n");
+        return;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(_clients_mutex);
+        for (const auto& pair : _client_usernames) {
+            if (pair.first != ctx.client_id && pair.second == new_nick) {
+                NetworkUtils::SendMessage(ctx.socket_fd, "Response " + ctx.msg_id + " Fail \"Nickname already in use\"\n");
+                return;
+            }
+        }
+        _client_usernames[ctx.client_id] = new_nick;
+    }
+
+    // If the client is already inside a room, propagate the new name (and to the game, if running).
+    auto room = _room_manager.GetClientRoom(ctx.client_id);
+    if (room) {
+        room->SetClientName(ctx.client_id, new_nick);
+    }
+
+    std::cout << "[Lobby] ClientID " << ctx.client_id << " is now known as " << new_nick << "\n";
+    NetworkUtils::SendMessage(ctx.socket_fd, "Response " + ctx.msg_id + " Success\n");
+    NetworkUtils::SendMessage(ctx.socket_fd, "LogChannel 0 \"Nickname set to " + new_nick + "\"\n");
+}
+
 void NetworkInterface::HandleCreateRoom(CommandContext& ctx) {
     std::string room_name, game_name, password;
     if (!(ctx.iss >> room_name >> game_name)) {
@@ -149,6 +207,7 @@ void NetworkInterface::HandleCreateRoom(CommandContext& ctx) {
         NetworkUtils::SendMessage(ctx.socket_fd, "Response " + ctx.msg_id + " Fail \"" + error + "\"\n");
         return;
     }
+    ApplyNicknameToRoom(ctx.client_id);
 
     NetworkUtils::SendMessage(ctx.socket_fd, "Response " + ctx.msg_id + " Success " + std::to_string(room_id) + "\n");
 }
@@ -167,8 +226,20 @@ void NetworkInterface::HandleJoinRoom(CommandContext& ctx) {
         NetworkUtils::SendMessage(ctx.socket_fd, "Response " + ctx.msg_id + " Fail \"" + error + "\"\n");
         return;
     }
+    ApplyNicknameToRoom(ctx.client_id);
 
     NetworkUtils::SendMessage(ctx.socket_fd, "Response " + ctx.msg_id + " Success\n");
+}
+
+void NetworkInterface::ApplyNicknameToRoom(int client_id) {
+    std::string nick = GetNickname(client_id);
+    if (nick.empty()) {
+        return;
+    }
+    auto room = _room_manager.GetClientRoom(client_id);
+    if (room) {
+        room->SetClientName(client_id, nick);
+    }
 }
 
 void NetworkInterface::HandleLeaveRoom(CommandContext& ctx) {

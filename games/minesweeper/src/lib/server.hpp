@@ -20,6 +20,9 @@ class Server {
         /// @brief Type definition for the message event handler callback function.
         using MessageEventHandler = std::function<void(int client_fd, const std::string& token)>;
 
+        /// @brief Type definition for the connection-closed event handler callback function.
+        using ClientDisconnectedHandler = std::function<void(int client_fd)>;
+
         /// @brief Constructor for the Server class.
         /// @param port The port on which the server will listen for incoming connections.
         Server(int port);
@@ -30,6 +33,11 @@ class Server {
         /// @brief Subscribe a callback function to the message received event.
         /// @param callback The function to be called when a message is received. It should accept two parameters: the client file descriptor and the received token.
         void OnMessageReceived(MessageEventHandler callback);
+
+        /// @brief Subscribe a callback to the connection-closed event.
+        /// @param callback Called once per connection after its socket stops delivering data, after the fd was removed
+        /// from the broadcast list but before it is closed (so the fd number cannot have been reused yet).
+        void OnClientDisconnected(ClientDisconnectedHandler callback);
 
         /// @brief Sends a message to a specific client identified by its socket file descriptor.
         /// @param client_fd The file descriptor of the client's socket.
@@ -45,7 +53,7 @@ class Server {
 
     private:
         /// @brief Maximum allowed bytes in a socket read buffer before dropping the connection.
-        static constexpr size_t MAX_BUFFER_SIZE = 8192;
+        static constexpr size_t MAX_BUFFER_SIZE = 65536;
 
         /// @brief The port number on which the server listens for incoming connections.
         int _port;
@@ -58,6 +66,9 @@ class Server {
         
         /// @brief Handles communication with a connected client. Reads tokens from the client and invokes the message received callback.
         MessageEventHandler _on_message_callback;
+
+        /// @brief Invoked when a client connection closes.
+        ClientDisconnectedHandler _on_disconnect_callback;
 
         /// @brief A list of active client socket file descriptors. Used to keep track of connected clients for broadcasting messages.
         std::vector<int> _active_clients;

@@ -137,7 +137,7 @@ class ClientState {
         /// @brief Maximum number of log lines kept in memory.
         static constexpr size_t MAX_LOG_HISTORY = 200;
         /// @brief Maximum allowed lines in the custom game canvas.
-        static constexpr size_t MAX_CANVAS_LINES = 30;
+        static constexpr size_t MAX_CANVAS_LINES = 100;
 
         /// @brief The unique ClientID assigned by the Lobby.
         int _client_id;

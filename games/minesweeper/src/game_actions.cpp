@@ -13,7 +13,7 @@ std::string Game::GetRoomPlayersString(int room_id)
         {
             if (!first)
                 out += ", ";
-            out += "Player " + std::to_string(p.getId());
+            out += p.getName();
             first = false;
         }
     }
@@ -21,7 +21,36 @@ std::string Game::GetRoomPlayersString(int room_id)
     return out;
 }
 
-void Game::BroadcastToRoom(int room_id, const std::string &message, Server &server)
+Room *Game::FindRoom(int room_id)
+{
+    for (auto &r : _rooms)
+    {
+        if (r.GetId() == room_id)
+            return &r;
+    }
+    return nullptr;
+}
+
+void Game::BroadcastRoomScreen(Room &room, Server &server)
+{
+    std::string screen = "@SCREEN_TAG " + GetRoomPlayersString(room.GetId());
+    switch (room.GetState())
+    {
+    case RoomState::LOBBY:
+        screen += "[ STATUS: LOBBY (Digite '!start' para começar) ]\n\n";
+        break;
+    case RoomState::NAMING:
+        screen += "[ STATUS: VITÓRIA! AGUARDANDO NOME DA EQUIPE (!name <nome>) ]\n\n";
+        break;
+    default:
+        screen += "[ STATUS: JOGANDO ]\n\n";
+        break;
+    }
+    screen += room.GetBoard().Render();
+    BroadcastToRoom(room.GetId(), screen, server);
+}
+
+void Game::BroadcastToRoom(int /*room_id*/, const std::string &message, Server &server)
 {
     std::string safe = message;
     bool is_screen = false;
@@ -36,15 +65,11 @@ void Game::BroadcastToRoom(int room_id, const std::string &message, Server &serv
         // Replace newlines with | for @SCREEN directive
         size_t pos;
         while ((pos = safe.find("\n")) != std::string::npos) {
-            safe.replace(pos, 1, " | ");
+            safe.replace(pos, 1, "|");
         }
         
         std::string packet = "LogChannel All \"@SCREEN " + safe + "\"\n";
-        for (const auto &p : _players) {
-            if (p.isConnected() && p.getRoomId() == room_id) {
-                server.SendMessage(p.getSocketFd(), packet);
-            }
-        }
+        server.Broadcast(packet);
     } else {
         // Send as regular line-by-line logs
         std::istringstream stream(safe);
@@ -54,11 +79,7 @@ void Game::BroadcastToRoom(int room_id, const std::string &message, Server &serv
             if (line.back() == '\r') line.pop_back();
             
             std::string packet = "LogChannel All \"" + line + "\"\n";
-            for (const auto &p : _players) {
-                if (p.isConnected() && p.getRoomId() == room_id) {
-                    server.SendMessage(p.getSocketFd(), packet);
-                }
-            }
+            server.Broadcast(packet);
         }
     }
 }
@@ -328,6 +349,49 @@ void Game::HandleNameTeam(int socket_fd, const std::string &msg_id, int client_i
         return;
     }
 
+    // Se a Lobby enviou como Admin (0), aplique à sala ativa
+    if (client_id == 0)
+    {
+        for (auto &r : _rooms)
+        {
+            if (r.GetId() == _active_room_id)
+            {
+                if (r.GetState() != RoomState::NAMING)
+                {
+                    server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"A sala não está aguardando nome.\"\n");
+                    return;
+                }
+
+                int player_count = 0;
+                std::vector<std::string> team_names;
+                for (auto &other : _players)
+                {
+                    if (other.isConnected() && other.getRoomId() == _active_room_id)
+                    {
+                        player_count++;
+                        team_names.push_back(other.getName());
+                    }
+                }
+
+                Leaderboard::SaveTeamScore(r.GetStatsFile(), team_names, r.GetPenaltySeconds(), player_count, team_name);
+
+                server.SendMessage(socket_fd, "Response " + msg_id + " Success\n");
+                BroadcastToRoom(_active_room_id, "\nRecorde salvo para a equipe '" + team_name + "'!\nVoltando ao LOBBY...\n", server);
+
+                std::this_thread::sleep_for(std::chrono::seconds(2));
+
+                r.Reset();
+
+                std::string board_render = "@SCREEN_TAG ";
+                board_render += GetRoomPlayersString(r.GetId());
+                board_render += "[ STATUS: LOBBY (Digite '!start' para começar) ]\n\n";
+                board_render += r.GetBoard().Render();
+                BroadcastToRoom(r.GetId(), board_render, server);
+                return;
+            }
+        }
+    }
+
     for (auto &p : _players)
     {
         if (p.getId() == client_id && p.getRoomId() != -1)
@@ -346,6 +410,7 @@ void Game::HandleNameTeam(int socket_fd, const std::string &msg_id, int client_i
 
                     // Check if p is host (first connected player in this room)
                     int host_id = -1;
+                    std::string host_name;
                     int player_count = 0;
                     for (auto &other : _players)
                     {
@@ -353,26 +418,29 @@ void Game::HandleNameTeam(int socket_fd, const std::string &msg_id, int client_i
                         {
                             player_count++;
                             if (host_id == -1)
+                            {
                                 host_id = other.getId();
+                                host_name = other.getName();
+                            }
                         }
                     }
 
                     if (client_id != host_id)
                     {
-                        server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"Apenas o líder (Player " + std::to_string(host_id) + ") pode nomear a equipe.\"\n");
+                        server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"Apenas o líder (" + host_name + ") pode nomear a equipe.\"\n");
                         return;
                     }
 
                     // Save stats
-                    std::vector<int> team_ids;
+                    std::vector<std::string> team_names;
                     for (auto &other : _players)
                     {
                         if (other.isConnected() && other.getRoomId() == room_id)
                         {
-                            team_ids.push_back(other.getId());
+                            team_names.push_back(other.getName());
                         }
                     }
-                    Leaderboard::SaveTeamScore(r.GetStatsFile(), team_ids, r.GetPenaltySeconds(), player_count, team_name);
+                    Leaderboard::SaveTeamScore(r.GetStatsFile(), team_names, r.GetPenaltySeconds(), player_count, team_name);
 
                     server.SendMessage(socket_fd, "Response " + msg_id + " Success\n");
                     BroadcastToRoom(room_id, "\nRecorde salvo para a equipe '" + team_name + "'!\nVoltando ao LOBBY...\n", server);

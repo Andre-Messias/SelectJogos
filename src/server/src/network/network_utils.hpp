@@ -20,7 +20,7 @@ class NetworkUtils {
 
     private:
         /// @brief Maximum allowed bytes in a stream buffer before disconnecting an unresponsive/malicious peer.
-        static constexpr size_t MAX_BUFFER_SIZE = 8192;
+        static constexpr size_t MAX_BUFFER_SIZE = 65536;
 
         /// @brief Defines the range of valid local ports for spawning game processes.
         static constexpr int MIN_LOCAL_PORT = 10000;

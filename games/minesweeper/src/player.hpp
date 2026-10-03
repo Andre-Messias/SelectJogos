@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <string>
 
 /// @brief Represents a player in the game, storing their identity, connection status, and round state.
 class Player
@@ -16,6 +17,8 @@ private:
     int _room_id;
     /// @brief Stores the time of the player's last action.
     std::chrono::steady_clock::time_point _last_action_time;
+    /// @brief Display name shown in the UI and leaderboard (defaults to "Player <id>").
+    std::string _name;
 
 public:
     /// @brief Constructs a new Player instance.
@@ -26,6 +29,12 @@ public:
     int getId() const;
     int getSocketFd() const;
     void setSocketFd(int socket_fd);
+
+    /// @brief Gets the player's display name.
+    const std::string &getName() const;
+
+    /// @brief Sets the player's display name. Empty names are ignored.
+    void setName(const std::string &name);
 
     /// @brief Updates the player's last action time to now.
     void updateActivity();

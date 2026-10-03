@@ -64,6 +64,14 @@ bool GameRoom::RemoveClient(int client_id) {
     return false;
 }
 
+void GameRoom::SetClientName(int client_id, const std::string& name) {
+    std::lock_guard<std::mutex> lock(_room_mutex);
+    _client_names[client_id] = name;
+    if (_bridge.IsActive() && _clients.count(client_id)) {
+        _bridge.Send("SetPlayerName internal_name " + std::to_string(client_id) + " " + name + "\n");
+    }
+}
+
 bool GameRoom::StartGame(int allocated_port) {
     bool expected = false;
     if (!_is_starting.compare_exchange_strong(expected, true)) {
@@ -125,7 +133,12 @@ bool GameRoom::DisconnectGame() {
 
 void GameRoom::SendClientRegistration(int client_id) {
     if (_bridge.IsActive()) {
-        _bridge.Send("ConnectClient internal_init " + std::to_string(client_id) + " " + std::to_string(_id) + "\n");
+        std::string payload = "ConnectClient internal_init " + std::to_string(client_id) + " " + std::to_string(_id);
+        auto name_it = _client_names.find(client_id);
+        if (name_it != _client_names.end()) {
+            payload += " " + name_it->second;
+        }
+        _bridge.Send(payload + "\n");
     }
 }
 
@@ -190,7 +203,8 @@ void GameRoom::ListenToGame() {
             const std::string& internal_msg_id = second_token;
             if (internal_msg_id == "internal_init" ||
                 internal_msg_id == "internal_disc" ||
-                internal_msg_id == "internal_recon") {
+                internal_msg_id == "internal_recon" ||
+                internal_msg_id == "internal_name") {
                 continue;
             }
 

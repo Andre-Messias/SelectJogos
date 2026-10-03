@@ -22,6 +22,11 @@ void ProtocolParser::RegisterAliases() {
     _command_aliases["lr"] = "ListRooms";
     _command_aliases["listrooms"] = "ListRooms";
 
+    // Identity commands
+    _command_aliases["nick"] = "SetNick";
+    _command_aliases["!nick"] = "SetNick";
+    _command_aliases["setnick"] = "SetNick";
+
     // Room management commands
     _command_aliases["cr"] = "CreateRoom";
     _command_aliases["createroom"] = "CreateRoom";
@@ -55,8 +60,8 @@ void ProtocolParser::RegisterScreenDirectives() {
         std::istringstream stream(content);
         std::string segment;
         while (std::getline(stream, segment, '|')) {
-            size_t first = segment.find_first_not_of(" \t\r\n");
-            size_t last = segment.find_last_not_of(" \t\r\n");
+            size_t first = segment.find_first_not_of("\r\n");
+            size_t last = segment.find_last_not_of("\r\n");
             if (first != std::string::npos && last != std::string::npos) {
                 lines.push_back(segment.substr(first, last - first + 1));
             } else {
@@ -156,6 +161,18 @@ void ProtocolParser::HandleLocalInput(const std::string& raw_input) {
 
     std::string remaining_params;
     std::getline(iss >> std::ws, remaining_params);
+
+    // Map custom game shortcuts directly to ServerAction payloads
+    if (raw_command == "!start") {
+        command = "ServerAction";
+        remaining_params = "StartGame";
+    } else if (raw_command == "!name") {
+        command = "ServerAction";
+        remaining_params = "NameTeam " + remaining_params;
+    } else if (raw_command == "!rank") {
+        command = "ServerAction";
+        remaining_params = "Ranking " + remaining_params;
+    }
 
     if (command == "ServerAction" && !remaining_params.empty()) {
         std::istringstream sa_iss(remaining_params);

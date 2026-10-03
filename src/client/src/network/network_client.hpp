@@ -48,7 +48,7 @@ class NetworkClient {
 
     private:
         /// @brief Maximum allowed bytes in the receive buffer before dropping the connection.
-        static constexpr size_t MAX_BUFFER_SIZE = 8192;
+        static constexpr size_t MAX_BUFFER_SIZE = 65536;
 
         /// @brief The socket file descriptor connected to the Lobby (-1 if disconnected).
         std::atomic<int> _socket_fd;

@@ -13,6 +13,10 @@ void Server::OnMessageReceived(MessageEventHandler callback) {
     _on_message_callback = callback;
 }
 
+void Server::OnClientDisconnected(ClientDisconnectedHandler callback) {
+    _on_disconnect_callback = callback;
+}
+
 void Server::SendMessage(int client_fd, const std::string& message) {
     if (client_fd == -1 || message.empty()) {
         return;
@@ -141,5 +145,10 @@ void Server::HandleClient(int client_fd) {
         std::lock_guard<std::mutex> lock(_clients_mutex);
         _active_clients.erase(std::remove(_active_clients.begin(), _active_clients.end(), client_fd), _active_clients.end());
     }
+
+    if (_on_disconnect_callback) {
+        _on_disconnect_callback(client_fd);
+    }
+
     close(client_fd);
 }

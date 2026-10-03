@@ -29,6 +29,10 @@ int main(int argc, char *argv[])
     server.OnMessageReceived([&game, &server](int socket_fd, const std::string &token)
                              { game.ProcessMessage(socket_fd, token, server); });
 
+    // When a connection (the Lobby's GameBridge) drops, clean up every player behind it
+    server.OnClientDisconnected([&game, &server](int socket_fd)
+                                { game.HandleSocketDisconnect(socket_fd, server); });
+
     // Start the background threads (like inactivity checker)
     game.Start(server);
 

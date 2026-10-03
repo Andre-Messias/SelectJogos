@@ -2,6 +2,9 @@
 
 The **Game Server Template** is structured to cleanly separate low-level POSIX socket communication (`src/lib/`) from high-level game rules and state management (`src/`).
 
+> [!NOTE]
+> Sections 1–4 still describe the original "Higher or Lower" template this game was forked from. Minesweeper-specific behavior that has been documented so far lives in [Section 5](#5-minesweeper-player-names--leaderboard).
+
 ---
 
 ## 1. Architectural Overview
@@ -82,3 +85,37 @@ The template implements a turn-independent simultaneous round game for `REQUIRED
 ### 4.3. `PlayerDisconnected <TargetClientID>`
 * **Origin:** Sent automatically by the Lobby Server (`0 0 PlayerDisconnected <TargetClientID>`) when a player leaves the room or drops their TCP connection.
 * **Execution:** Removes `<TargetClientID>` from the `_players` map so the remaining players are not blocked waiting for a disconnected participant, and broadcasts the disconnection via `LogChannel All`. Note that no `Response` packet is sent because `<MsgID>` is `0`.
+
+
+---
+
+## 5. Minesweeper: Player Names & Leaderboard
+
+### 5.1. Where names come from
+Players pick a nickname in the Lobby with `SetNick` (client shortcut: `nick <Name>`). The Lobby validates it (1–16 chars of `[A-Za-z0-9_.-]`, unique among connected clients) and delivers it to the game in one of two ways:
+
+| Situation | Message received by the game | Handler |
+| :--- | :--- | :--- |
+| Name set before the player is registered (before `sg`, or before joining) | `ConnectClient internal_init <ClientID> <LobbyRoomID> <Nickname>` | `Game::HandleConnectClient` (`src/game_connection.cpp`) |
+| Name set/changed while already registered in the running match | `SetPlayerName internal_name <ClientID> <Nickname>` | `Game::HandleSetPlayerName` (`src/game_connection.cpp`) |
+
+Players that never set a nickname keep the default `Player <ClientID>` assigned in the `Player` constructor.
+
+### 5.2. Where names are used
+* **`Player::_name`** (`src/player.hpp`): stores the display name. `setName("")` is a no-op, so a missing token never erases a name.
+* **Screen header**: `Game::GetRoomPlayersString()` builds `[ Jogadores na sala: Alex_W, Pintudo ]` from `getName()`.
+* **Logs**: join/return messages (`"<name> entrou no servidor."`, `"<name> voltou."`), live renames (`"<old> agora é <new>."`, followed by a header refresh), and the "only the leader can name the team" error.
+
+### 5.3. Leaderboard storage (`stats_easy.txt`, `stats_medium.txt`, `stats_hard.txt`)
+Files live in the game process's working directory and are append-only, so they survive server restarts. Each winning team writes **one line per player**:
+
+```text
+<PlayerName> <TotalSeconds> <PlayerCount> <TeamName>
+```
+
+* Names are stored as a single whitespace-free token. The default `Player 123` is written as `Player_123`.
+* `!rank <easy|medium|hard>` (`Ranking`) keeps each player's **best** time, sorts ascending, and prints `rank | player | mm:ss | team | N jog.`.
+* **Backward compatibility:** older files stored bare numeric client IDs (`482910 107 2 pintudos`). Those lines still parse and are shown as `Player 482910`.
+
+> [!NOTE]
+> The leaderboard is keyed by name, so the same nickname across sessions accumulates into one entry. Client IDs are random for each connection, which is why they were replaced as the key.

@@ -99,6 +99,36 @@ Lists all active rooms currently open in the Lobby.
 
 ---
 
+### 3.1.1. Identity Commands
+
+#### `SetNick`
+Sets the client's display nickname. Clients without a nickname appear as `Player <ClientID>` inside games.
+* **Scope:** Available anywhere — in the Lobby, in a waiting room, or during a running match.
+* **Syntax:** `SetNick <MsgID> <Nickname>`
+* **Rules:**
+  * 1–16 characters, only `A–Z`, `a–z`, `0–9`, `_`, `-` and `.` (nicknames travel inside space-separated protocol lines and quoted `LogChannel` payloads).
+  * Must be unique among currently connected clients.
+  * Only the first token is used: `SetNick m5 cool name` sets the nickname to `cool`.
+  * Released automatically when the client disconnects.
+* **Example Request:**
+  ```text
+  SetNick m5 Alex_W
+  ```
+* **Success Response + private confirmation:**
+  ```text
+  Response m5 Success
+  LogChannel 0 "Nickname set to Alex_W"
+  ```
+* **Propagation:**
+  * Set **before** creating/joining a room → the nickname is attached to the `ConnectClient` registration sent to the game.
+  * Set **while in a room with a running match** → the Lobby forwards `SetPlayerName` to the game immediately (see `GAME_INTEGRATION.md` §3.1).
+* **Possible Failures:**
+  * `"Usage: SetNick <MsgID> <Nickname>"`
+  * `"Nickname must be 1-16 chars of letters, digits, '_', '-' or '.'"`
+  * `"Nickname already in use"`
+
+---
+
 ### 3.2. Room Management Commands
 
 #### `CreateRoom`

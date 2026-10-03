@@ -9,6 +9,9 @@
 #include "id_generator.hpp"
 #include "room_manager.hpp"
 
+/// @brief Maximum accepted length (in bytes) for a client nickname.
+constexpr size_t MAX_NICKNAME_LENGTH = 16;
+
 /// @brief Encapsulates all metadata and stream payload for a parsed client command.
 struct CommandContext {
     /// @brief The ID of the client sending the command.
@@ -55,6 +58,8 @@ private:
     std::unordered_map<std::string, CommandHandler> _command_registry;
     /// @brief Maps client IDs to their corresponding socket file descriptors for communication.
     std::unordered_map<int, int> _client_sockets;
+    /// @brief Maps client IDs to their display usernames.
+    std::unordered_map<int, std::string> _client_usernames;
     /// @brief Mutex to protect access to the client sockets map, ensuring thread safety.
     std::mutex _clients_mutex;
 
@@ -81,6 +86,18 @@ private:
     /// @brief Lists all active rooms and their states to the client.
     /// @param ctx The context containing client information and message data.
     void HandleListRooms(CommandContext& ctx);
+
+    /// @brief Sets the client's display nickname (SetNick <MsgID> <Nickname>).
+    /// @param ctx The context containing client information and message data.
+    void HandleSetNick(CommandContext& ctx);
+
+    /// @brief Returns the client's nickname, or an empty string if none was set.
+    /// @param client_id The ID of the client.
+    std::string GetNickname(int client_id);
+
+    /// @brief Pushes the client's nickname (if any) to the room the client is currently in.
+    /// @param client_id The ID of the client.
+    void ApplyNicknameToRoom(int client_id);
 
     /// @brief Creates a new game room.
     /// @param ctx The context containing client information and message data.

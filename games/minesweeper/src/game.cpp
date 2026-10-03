@@ -81,6 +81,11 @@ void Game::RegisterCommands()
         this->HandleReconnectClient(fd, mid, cid, iss, srv);
     };
 
+    _command_registry["SetPlayerName"] = [this](int fd, const std::string &mid, int cid, std::istringstream &iss, Server &srv)
+    {
+        this->HandleSetPlayerName(fd, mid, cid, iss, srv);
+    };
+
     _command_registry["JoinRoom"] = [this](int fd, const std::string &mid, int cid, std::istringstream &iss, Server &srv)
     {
         this->HandleJoinRoom(fd, mid, cid, iss, srv);

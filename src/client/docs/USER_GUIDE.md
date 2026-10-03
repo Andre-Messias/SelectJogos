@@ -98,6 +98,7 @@ When using the TUI Client, two low-level protocol details are handled automatica
 | :--- | :--- | :--- | :--- | :--- |
 | **Discovery** | `ListGames` | `lg`, `listgames` | `lg` | Lists all games registered on the Lobby Server (`[Local]` and `[Remote]`). |
 | **Discovery** | `ListRooms` | `lr`, `listrooms` | `lr` | Lists all active rooms, their `RoomID`, game name, privacy (`[Public]`/`[Private]`), and status (`[Waiting]`/`[Playing]`). |
+| **Identity** | `SetNick` | `nick`, `!nick`, `setnick` | `nick <Name>` | Sets your display name (1–16 chars: letters, digits, `_`, `-`, `.`; must be unique). Works anywhere; inside a running match the new name appears immediately. Without one you show up as `Player <ClientID>`. |
 | **Room** | `CreateRoom` | `cr`, `createroom` | `cr <RoomName> <GameName> [Password]` | Creates a new room for `<GameName>` (with optional `[Password]`) and joins it as the room creator (Host). |
 | **Room** | `JoinRoom` | `jr`, `joinroom` | `jr <RoomID> [Password]` | Joins an existing room by its numeric `<RoomID>`. |
 | **Room** | `LeaveRoom` | `lv`, `leaveroom` | `lv` | Leaves the current room and returns to `[Lobby]`. |
@@ -120,6 +121,7 @@ Below is a complete two-player example using shorthand commands:
 
 ### Player 1 (Room Creator / Host)
 ```text
+> nick Alex_W                         # (Optional) Pick a display name
 > lg                                  # Check available games
 > cr Arena1 MaiorMenor 123            # Create private room 'Arena1' with password '123'
                                       # (Header updates to show RoomID, e.g., 747671)
@@ -133,6 +135,7 @@ Below is a complete two-player example using shorthand commands:
 
 ### Player 2 (Challenger)
 ```text
+> nick Pintudo                        # (Optional) Pick a display name
 > lr                                  # Find the RoomID of 'Arena1' (e.g., ID:747671)
 > jr 747671 123                       # Join room 747671 using password '123'
                                       # Wait for Player 1 to start the game...
@@ -158,6 +161,7 @@ The `Help` command (`h`, `help`, or `?`) reads its output dynamically from `src/
 --- AVAILABLE COMMANDS (Full Name | Shorthand) ---
 [Discovery]  ListGames (lg)                     - List available games
 [Discovery]  ListRooms (lr)                     - List active rooms
+[Identity]   SetNick (nick) <Name>              - Set display name (max 16)
 [Room]       CreateRoom (cr) <Name> <Game> [Pw] - Create and join a room
 [Room]       JoinRoom (jr) <RoomID> [Pw]        - Join an existing room
 [Room]       LeaveRoom (lv)                     - Leave current room
@@ -166,6 +170,8 @@ The `Help` command (`h`, `help`, or `?`) reads its output dynamically from `src/
 [Host Only]  KickPlayer (kp) <ClientID>         - Kick a player from room
 [Host Only]  ServerAction (sa) <Cmd> [Args...]  - Admin action (e.g., 'sa rr')
 [In-Game]    PlayerAction (pa) <Args...>        - Send move to running game
+[Mines]      pa A5 | pa fA5 | pa uA5            - Reveal / flag / unflag
+[Mines]      !start | !name <T> | !rank <d>     - Start / save team / ranking
 [Client]     Help (h, ?) | exit / quit          - Show help or close client
 --------------------------------------------------
 ```
