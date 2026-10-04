@@ -6,7 +6,7 @@ HELP ?= help.txt
 SRC_DIR = src
 
 # List all active games here
-GAMES_LIST = template minesweeper
+GAMES_LIST = template minesweeper battleship
 
 all: games src
 
