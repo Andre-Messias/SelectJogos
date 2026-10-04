@@ -12,9 +12,10 @@ The ecosystem consists of three decoupled, network-connected modules:
 ## 1. Group Members
 
 * **Member 1:** `André Luiz Santos Messias 15493857`
-* **Member 2:** `[Full Name - Student ID]`
-* **Member 3:** `[Full Name - Student ID]`
-* **Member 4:** `[Full Name - Student ID]`
+* **Member 2:** `Alexandre Brenner Weber 15436911`
+* **Member 3:** `Matheus Marchi Baron 14598431`
+* **Member 4:** `Pedro Dorigatti Aureo Ferreira 15483592`
+* **Member 5:** `Pedro Henrique Vieira de Freitas 15652829`
 
 ---
 
