@@ -1,6 +1,7 @@
 #include "server.hpp"
 
-Server::Server(int port) : _port(port), _server_fd(-1), _is_running(false) {}
+Server::Server(int port)
+    : _port(port), _server_fd(-1), _is_running(false) {}
 
 Server::~Server() {
     _is_running.store(false);
@@ -22,6 +23,7 @@ void Server::SendMessage(int client_fd, const std::string& message) {
     size_t total_sent = 0;
     size_t length = message.length();
 
+    // send() pode transmitir apenas parte da mensagem.
     while (total_sent < length) {
         ssize_t sent = send(client_fd, data + total_sent, length - total_sent, MSG_NOSIGNAL);
         if (sent < 0) {
@@ -70,12 +72,12 @@ void Server::Start() {
                 std::lock_guard<std::mutex> lock(_clients_mutex);
                 _active_clients.push_back(client_fd);
             }
-            
             std::thread(&Server::HandleClient, this, client_fd).detach();
         }
     }
 }
 
+// Reúne leituras parciais até encontrar o fim de uma linha do protocolo.
 std::string Server::ReadToken(int socket_fd, std::string& buffer) {
     while (true) {
         size_t pos;
@@ -98,12 +100,12 @@ std::string Server::ReadToken(int socket_fd, std::string& buffer) {
                 if (buffer.empty()) {
                     return "";
                 }
-                std::string ultimo = buffer;
+                std::string last_token = buffer;
                 buffer.clear();
-                if (!ultimo.empty() && ultimo.back() == '\r') {
-                    ultimo.pop_back();
+                if (!last_token.empty() && last_token.back() == '\r') {
+                    last_token.pop_back();
                 }
-                return ultimo;
+                return last_token;
             }
 
             buffer.append(temp, static_cast<size_t>(bytes_read));
@@ -123,23 +125,26 @@ std::string Server::ReadToken(int socket_fd, std::string& buffer) {
 }
 
 void Server::HandleClient(int client_fd) {
-    std::string buffer = "";
-            
+    std::string buffer;
+
     while (true) {
         std::string token = ReadToken(client_fd, buffer);
-        
+
         if (token.empty()) {
-            break; 
+            break;
         }
 
         if (_on_message_callback) {
             _on_message_callback(client_fd, token);
         }
     }
-    
+
     {
         std::lock_guard<std::mutex> lock(_clients_mutex);
-        _active_clients.erase(std::remove(_active_clients.begin(), _active_clients.end(), client_fd), _active_clients.end());
+        _active_clients.erase(
+            std::remove(_active_clients.begin(), _active_clients.end(), client_fd),
+            _active_clients.end()
+        );
     }
     close(client_fd);
 }

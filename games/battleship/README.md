@@ -10,7 +10,6 @@ da Batalha Naval manualmente.
 Abra um terminal na raiz do repositório:
 
 ```bash
-cd /home/pedro/SelectJogos
 make
 make run-server PORT=8080
 ```
@@ -19,10 +18,9 @@ Deixe esse terminal aberto. O comando `make` compila o lobby, o cliente e os jog
 
 ## Passo 2 — Conectar o jogador 1 e criar a sala
 
-Abra um segundo terminal:
+Abra um segundo terminal na raiz do repositório:
 
 ```bash
-cd /home/pedro/SelectJogos
 make run-client HOST=127.0.0.1 PORT=8080
 ```
 
@@ -39,10 +37,9 @@ escolha do modo.
 
 ## Passo 3 — Conectar o jogador 2
 
-Abra um terceiro terminal e execute:
+Abra um terceiro terminal na raiz do repositório e execute:
 
 ```bash
-cd /home/pedro/SelectJogos
 make run-client HOST=127.0.0.1 PORT=8080
 ```
 
@@ -176,6 +173,7 @@ Se mais de duas pessoas entrarem na sala, as excedentes ficam como
 
 ## Para desenvolvedores
 
-As regras e o protocolo estão em `src/board.*` e `src/game.*`. A camada de
-rede fica em `src/main.cpp` e `src/lib/server.*`. O contrato com o lobby está em
+O tabuleiro fica em `src/board.*`, o estado de cada jogador em `src/player.*`
+e o controle da partida em `src/game.*`. A camada de rede fica em `src/main.cpp`
+e `src/lib/server.*`. O contrato com o lobby está em
 [`src/server/docs/GAME_INTEGRATION.md`](../../src/server/docs/GAME_INTEGRATION.md).
