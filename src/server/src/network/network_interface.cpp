@@ -78,7 +78,7 @@ void NetworkInterface::HandleClient(int client_fd, int client_id) {
         _client_usernames.erase(client_id);
     }
 
-    _room_manager.RemoveClientFromRoom(client_id);
+    _room_manager.RemoveClientFromRoom(client_id, true);
     _client_id_gen.ReleaseId(client_id);
 
     close(client_fd);
@@ -158,9 +158,20 @@ std::string NetworkInterface::GetNickname(int client_id) {
     return (it != _client_usernames.end()) ? it->second : "";
 }
 
+static std::string ToLower(std::string s) {
+    for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return s;
+}
+
 void NetworkInterface::HandleSetNick(CommandContext& ctx) {
     std::string new_nick;
     if (!(ctx.iss >> new_nick)) {
+        NetworkUtils::SendMessage(ctx.socket_fd, "Response " + ctx.msg_id + " Fail \"Usage: SetNick <MsgID> <Nickname>\"\n");
+        return;
+    }
+    
+    std::string extra;
+    if (ctx.iss >> extra) {
         NetworkUtils::SendMessage(ctx.socket_fd, "Response " + ctx.msg_id + " Fail \"Usage: SetNick <MsgID> <Nickname>\"\n");
         return;
     }
@@ -173,8 +184,9 @@ void NetworkInterface::HandleSetNick(CommandContext& ctx) {
 
     {
         std::lock_guard<std::mutex> lock(_clients_mutex);
+        const std::string key = ToLower(new_nick);
         for (const auto& pair : _client_usernames) {
-            if (pair.first != ctx.client_id && pair.second == new_nick) {
+            if (pair.first != ctx.client_id && ToLower(pair.second) == key) {
                 NetworkUtils::SendMessage(ctx.socket_fd, "Response " + ctx.msg_id + " Fail \"Nickname already in use\"\n");
                 return;
             }
@@ -202,12 +214,11 @@ void NetworkInterface::HandleCreateRoom(CommandContext& ctx) {
     ctx.iss >> password;
 
     std::string error;
-    int room_id = _room_manager.CreateRoom(ctx.client_id, ctx.socket_fd, room_name, game_name, password, error);
+    int room_id = _room_manager.CreateRoom(ctx.client_id, ctx.socket_fd, room_name, game_name, password, error, GetNickname(ctx.client_id));
     if (room_id == -1) {
         NetworkUtils::SendMessage(ctx.socket_fd, "Response " + ctx.msg_id + " Fail \"" + error + "\"\n");
         return;
     }
-    ApplyNicknameToRoom(ctx.client_id);
 
     NetworkUtils::SendMessage(ctx.socket_fd, "Response " + ctx.msg_id + " Success " + std::to_string(room_id) + "\n");
 }
@@ -222,25 +233,14 @@ void NetworkInterface::HandleJoinRoom(CommandContext& ctx) {
     ctx.iss >> password;
 
     std::string error;
-    if (!_room_manager.JoinRoom(ctx.client_id, ctx.socket_fd, room_id, password, error)) {
+    if (!_room_manager.JoinRoom(ctx.client_id, ctx.socket_fd, room_id, password, error, GetNickname(ctx.client_id))) {
         NetworkUtils::SendMessage(ctx.socket_fd, "Response " + ctx.msg_id + " Fail \"" + error + "\"\n");
         return;
     }
-    ApplyNicknameToRoom(ctx.client_id);
 
     NetworkUtils::SendMessage(ctx.socket_fd, "Response " + ctx.msg_id + " Success\n");
 }
 
-void NetworkInterface::ApplyNicknameToRoom(int client_id) {
-    std::string nick = GetNickname(client_id);
-    if (nick.empty()) {
-        return;
-    }
-    auto room = _room_manager.GetClientRoom(client_id);
-    if (room) {
-        room->SetClientName(client_id, nick);
-    }
-}
 
 void NetworkInterface::HandleLeaveRoom(CommandContext& ctx) {
     if (!_room_manager.RemoveClientFromRoom(ctx.client_id)) {

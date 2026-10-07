@@ -73,7 +73,10 @@ void Game::HandleConnectClient(int socket_fd, const std::string &msg_id, int cli
 
     player->setConnected(true);
     player->setSocketFd(socket_fd);
-    player->setName(nickname);
+    if (nickname.empty())
+        player->resetName();
+    else
+        player->setName(nickname);
     player->setRoomId(_active_room_id); // Every player joins the currently active difficulty
     player->updateActivity();
 

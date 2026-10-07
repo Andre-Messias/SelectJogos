@@ -15,6 +15,11 @@ void Player::setName(const std::string &name)
         _name = name;
 }
 
+void Player::resetName()
+{
+    _name = "Player " + std::to_string(_id);
+}
+
 void Player::updateActivity()
 {
     _last_action_time = std::chrono::steady_clock::now();

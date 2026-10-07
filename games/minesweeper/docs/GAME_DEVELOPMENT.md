@@ -16,7 +16,7 @@ Any text sent by the client not prefixed with `!` is wrapped into `PlayerAction 
 
 ### 1.2. Meta Commands
 * **`!start`** -> `StartGame`
-* **`!name <team_name>`** -> `NameTeam <team_name>` (Only the host can execute this after winning).
+* **`!name <team_name>`** -> `NameTeam <team_name>` (Any player can execute this after winning).
 * **`!rank <dificuldade>`** -> `Ranking <easy|medium|hard>`
 
 ---
@@ -46,18 +46,20 @@ This guarantees that all players see exactly the same grid layout at the same ti
 
 ---
 
-## 3. The Penalty System
+## 3. The Game Over Mechanic
 
-Instead of ending the game immediately upon clicking a mine, Campo Minado allows the team to continue playing at the cost of a severe time penalty.
+Instead of adding a penalty and continuing, stepping on a mine in Campo Minado immediately ends the current game. 
 
 In `Game::HandlePlayerAction`:
 ```cpp
-bool hit_bomb = r->GetBoard().Reveal(row, col);
+bool hit_bomb = r->GetBoard().Reveal(parsed_move.row, parsed_move.col);
 if (hit_bomb) {
-    int penalty = (r->GetId() == 1) ? 15 : ((r->GetId() == 2) ? 20 : 30);
-    r->AddPenalty(penalty);
-    server.SendMessage(socket_fd, "BOOM! Penalidade de tempo adicionada!\n");
+    auto now = std::chrono::steady_clock::now();
+    int elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - r->GetStartTime()).count();
+    r->SetLost(elapsed);
+    r->GetBoard().RevealMines(parsed_move.row, parsed_move.col);
+    // ...
 }
 ```
 
-The `Room::GetPenaltySeconds()` value is simply added to the raw elapsed time (`now - start_time`) when the board is completely cleared, heavily incentivizing careful logic over random clicking.
+The board state freezes in `LOST` mode, revealing all the bombs and showing an exploding animation on the fatal block. The team must type `!start` to reset the room and try again.

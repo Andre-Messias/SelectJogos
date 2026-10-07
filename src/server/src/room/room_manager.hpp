@@ -29,9 +29,10 @@ class RoomManager {
         /// @param game_name The name of the game to be played in the room.
         /// @param password An optional password for the room.
         /// @param out_error A string to hold any error messages if creation fails.
+        /// @param nickname The creator's nickname, if any.
         /// @return The generated room_id, or -1 if creation failed (error written to out_error).
         int CreateRoom(int creator_id, int creator_fd, const std::string& room_name, 
-            const std::string& game_name, const std::string& password, std::string& out_error);
+            const std::string& game_name, const std::string& password, std::string& out_error, const std::string& nickname = "");
 
         /// @brief Adds a client to an existing room.
         /// @param client_id The ID of the client joining the room.
@@ -39,13 +40,15 @@ class RoomManager {
         /// @param room_id The ID of the room to join.
         /// @param password The password provided by the client (if any).
         /// @param out_error A string to hold any error messages if joining fails.
+        /// @param nickname The joining client's nickname, if any.
         /// @return True if the client successfully joined the room, false otherwise (error written to out_error).
-        bool JoinRoom(int client_id, int client_fd, int room_id, const std::string& password, std::string& out_error);
+        bool JoinRoom(int client_id, int client_fd, int room_id, const std::string& password, std::string& out_error, const std::string& nickname = "");
 
         /// @brief Removes a client from their current room, handling host migration and empty room cleanup.
         /// @param client_id The ID of the client leaving the room.
+        /// @param permanent If true, the client is permanently removed and cannot reconnect to the match.
         /// @return True if the client was successfully removed from a room, false if they were not in any room.
-        bool RemoveClientFromRoom(int client_id);
+        bool RemoveClientFromRoom(int client_id, bool permanent = false);
 
         /// @brief Retrieves the room a client is currently in, or nullptr if in the lobby.
         /// @param client_id The ID of the client.

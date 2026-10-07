@@ -32,26 +32,34 @@ bool GameRoom::HasClient(int client_id) {
     return _clients.find(client_id) != _clients.end();
 }
 
-void GameRoom::AddClient(int client_id, int socket_fd) {
+void GameRoom::AddClient(int client_id, int socket_fd, const std::string& nickname) {
     std::lock_guard<std::mutex> lock(_room_mutex);
     _clients[client_id] = socket_fd;
     _player_count.store(_clients.size());
 
+    if (!nickname.empty()) {
+        _client_names[client_id] = nickname;
+    }
+
     if (_bridge.IsActive()) {
         if (_disconnected_clients.erase(client_id) > 0) {
             SendClientReconnection(client_id);
+            SendClientName(client_id);
         } else {
             SendClientRegistration(client_id);
         }
     }
 }
 
-bool GameRoom::RemoveClient(int client_id) {
+bool GameRoom::RemoveClient(int client_id, bool permanent) {
     std::lock_guard<std::mutex> lock(_room_mutex);
     if (_clients.erase(client_id) > 0) {
         _player_count.store(_clients.size());
+        _client_names.erase(client_id);
         if (_bridge.IsActive()) {
-            _disconnected_clients.insert(client_id);
+            if (!permanent) {
+                _disconnected_clients.insert(client_id);
+            }
             SendClientDisconnection(client_id);
         }
     }
@@ -67,8 +75,15 @@ bool GameRoom::RemoveClient(int client_id) {
 void GameRoom::SetClientName(int client_id, const std::string& name) {
     std::lock_guard<std::mutex> lock(_room_mutex);
     _client_names[client_id] = name;
+    SendClientName(client_id);
+}
+
+void GameRoom::SendClientName(int client_id) {
     if (_bridge.IsActive() && _clients.count(client_id)) {
-        _bridge.Send("SetPlayerName internal_name " + std::to_string(client_id) + " " + name + "\n");
+        auto name_it = _client_names.find(client_id);
+        if (name_it != _client_names.end()) {
+            _bridge.Send("SetPlayerName internal_name " + std::to_string(client_id) + " " + name_it->second + "\n");
+        }
     }
 }
 

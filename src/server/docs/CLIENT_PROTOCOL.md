@@ -107,8 +107,8 @@ Sets the client's display nickname. Clients without a nickname appear as `Player
 * **Syntax:** `SetNick <MsgID> <Nickname>`
 * **Rules:**
   * 1–16 characters, only `A–Z`, `a–z`, `0–9`, `_`, `-` and `.` (nicknames travel inside space-separated protocol lines and quoted `LogChannel` payloads).
-  * Must be unique among currently connected clients.
-  * Only the first token is used: `SetNick m5 cool name` sets the nickname to `cool`.
+  * Must be unique among currently connected clients (case-insensitive: `Alex` and `alex` are considered the same).
+  * No extra parameters are allowed: `SetNick m5 cool name` will fail with a usage error.
   * Released automatically when the client disconnects.
 * **Example Request:**
   ```text

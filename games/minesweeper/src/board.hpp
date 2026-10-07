@@ -12,6 +12,7 @@ struct Cell
     int type; // 0 = vazio, 1-8 = contagem de bombas vizinhas, 9 = bomba
     bool revealed;
     bool flagged;
+    bool exploded;
 };
 
 struct MoveInput
@@ -39,6 +40,9 @@ public:
 
     // Revela uma célula. Retorna true se pisou em bomba.
     bool Reveal(int row, int col);
+
+    // Revela todas as bombas quando o jogo é perdido
+    void RevealMines(int hit_row, int hit_col);
 
     // Marca/desmarca flag numa célula
     void SetFlag(int row, int col, bool flagged);

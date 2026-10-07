@@ -78,12 +78,14 @@ class GameRoom : public std::enable_shared_from_this<GameRoom> {
         /// @brief Adds a client to the room.
         /// @param client_id The ID of the client to add.
         /// @param socket_fd The file descriptor of the client's socket.
-        void AddClient(int client_id, int socket_fd);
+        /// @param nickname The client's nickname, if any.
+        void AddClient(int client_id, int socket_fd, const std::string& nickname = "");
 
         /// @brief Removes a client from the room.
         /// @param client_id The ID of the client to remove.
+        /// @param permanent If true, the client is permanently removed and cannot reconnect to the match.
         /// @return true if the room creator changed as a result of the removal, false otherwise.
-        bool RemoveClient(int client_id);
+        bool RemoveClient(int client_id, bool permanent = false);
 
         /// @brief Records a display nickname for a client and, if a game is running, forwards it (SetPlayerName).
         /// @param client_id The ID of the client.
@@ -149,6 +151,10 @@ class GameRoom : public std::enable_shared_from_this<GameRoom> {
         /// @brief Sends a client reconnection message (ReconnectClient) to the game.
         /// @param client_id The ID of the client rejoining the active match.
         void SendClientReconnection(int client_id);
+
+        /// @brief Sends the client's current nickname (SetPlayerName) to the game, if any.
+        /// @param client_id The ID of the client whose name should be sent.
+        void SendClientName(int client_id);
 
         /// @brief Routes a LogChannel message from the game to either all players or a specific IdList.
         /// @param target The target specification ("All" or comma-separated client IDs).

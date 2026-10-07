@@ -42,7 +42,7 @@ std::string RoomManager::FormatRoomsList() {
 }
 
 int RoomManager::CreateRoom(int creator_id, int creator_fd, const std::string& room_name,
-    const std::string& game_name, const std::string& password, std::string& out_error) {
+    const std::string& game_name, const std::string& password, std::string& out_error, const std::string& nickname) {
     std::lock_guard<std::mutex> lock(_manager_mutex);
 
     if (_client_to_room.find(creator_id) != _client_to_room.end()) {
@@ -63,7 +63,7 @@ int RoomManager::CreateRoom(int creator_id, int creator_fd, const std::string& r
     }
 
     auto new_room = std::make_shared<GameRoom>(room_id, room_name, password, creator_id, game_it->second);
-    new_room->AddClient(creator_id, creator_fd);
+    new_room->AddClient(creator_id, creator_fd, nickname);
 
     _rooms[room_id] = new_room;
     _client_to_room[creator_id] = room_id;
@@ -73,7 +73,7 @@ int RoomManager::CreateRoom(int creator_id, int creator_fd, const std::string& r
     return room_id;
 }
 
-bool RoomManager::JoinRoom(int client_id, int client_fd, int room_id, const std::string& password, std::string& out_error) {
+bool RoomManager::JoinRoom(int client_id, int client_fd, int room_id, const std::string& password, std::string& out_error, const std::string& nickname) {
     std::lock_guard<std::mutex> lock(_manager_mutex);
 
     if (_client_to_room.find(client_id) != _client_to_room.end()) {
@@ -93,7 +93,7 @@ bool RoomManager::JoinRoom(int client_id, int client_fd, int room_id, const std:
         return false;
     }
 
-    room->AddClient(client_id, client_fd);
+    room->AddClient(client_id, client_fd, nickname);
     _client_to_room[client_id] = room_id;
 
     std::cout << "[Lobby] ClientID " << client_id << " joined room ID " << room_id << "\n";
@@ -101,7 +101,7 @@ bool RoomManager::JoinRoom(int client_id, int client_fd, int room_id, const std:
     return true;
 }
 
-bool RoomManager::RemoveClientFromRoom(int client_id) {
+bool RoomManager::RemoveClientFromRoom(int client_id, bool permanent) {
     std::lock_guard<std::mutex> lock(_manager_mutex);
 
     auto it = _client_to_room.find(client_id);
@@ -115,7 +115,7 @@ bool RoomManager::RemoveClientFromRoom(int client_id) {
     auto room_it = _rooms.find(room_id);
     if (room_it != _rooms.end()) {
         auto& room = room_it->second;
-        bool creator_changed = room->RemoveClient(client_id);
+        bool creator_changed = room->RemoveClient(client_id, permanent);
 
         std::cout << "[Lobby] ClientID " << client_id << " left room ID " << room_id << "\n";
 

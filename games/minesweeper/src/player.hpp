@@ -36,6 +36,9 @@ public:
     /// @brief Sets the player's display name. Empty names are ignored.
     void setName(const std::string &name);
 
+    /// @brief Resets the player's name to the default value.
+    void resetName();
+
     /// @brief Updates the player's last action time to now.
     void updateActivity();
 

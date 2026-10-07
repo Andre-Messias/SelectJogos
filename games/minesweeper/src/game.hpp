@@ -112,4 +112,7 @@ private:
 
     /// @brief Broadcasts a message to all players currently in a specific room.
     void BroadcastToRoom(int room_id, const std::string &message, Server &server);
+
+    /// @brief Sends a message to a specific player via LogChannel
+    void SendToPlayer(int client_id, const std::string &message, Server &server);
 };

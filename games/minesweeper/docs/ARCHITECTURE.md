@@ -51,10 +51,10 @@ When `Game::ProcessMessage` receives a line:
    Sent by the host (`ClientID 0`) or `!start`. The room enters `PLAYING`.
 3. **`PlayerAction <Move>`**: 
    The player sends a move like `B3` or `f C4`. The string is parsed, indices are converted to X/Y coordinates, and `Board::Reveal` or `Board::SetFlag` is executed.
-   - If a mine is hit, `Room::AddPenalty` applies the time penalty.
+   - If a mine is hit, `Room::SetLost` is called, `Board::RevealMines` reveals the board, and the game enters `LOST` state.
    - If the board is complete, `Room::SetWon` stops the timer and enters `NAMING`.
 4. **`NameTeam <TeamName>`**:
-   Sent by the host. Saves the team's final time to the stats file via `Leaderboard::SaveTeamScore`. Resets the room back to `LOBBY`.
+   Sent by any player. Saves the team's final time to the stats file via `Leaderboard::SaveTeamScore`. Resets the room back to `LOBBY`.
 
 ---
 

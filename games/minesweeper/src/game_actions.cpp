@@ -3,6 +3,7 @@
 #include <iostream>
 #include <sstream>
 #include <algorithm>
+#include <regex>
 
 std::string Game::GetRoomPlayersString(int room_id)
 {
@@ -52,6 +53,9 @@ void Game::BroadcastRoomScreen(Room &room, Server &server)
         break;
     case RoomState::NAMING:
         screen += "[ STATUS: VITÓRIA! AGUARDANDO NOME DA EQUIPE (!name <nome>) ]\n\n";
+        break;
+    case RoomState::LOST:
+        screen += "[ STATUS: GAME OVER! (Digite '!start' para tentar novamente) ]\n\n";
         break;
     default:
         screen += "[ STATUS: JOGANDO ]\n\n";
@@ -103,6 +107,22 @@ void Game::BroadcastToRoom(int /*room_id*/, const std::string &message, Server &
     }
 }
 
+void Game::SendToPlayer(int client_id, const std::string &message, Server &server)
+{
+    std::istringstream stream(message);
+    std::string line;
+    while (std::getline(stream, line))
+    {
+        if (line.empty() || line == "\r")
+            continue;
+        if (line.back() == '\r')
+            line.pop_back();
+
+        std::string packet = "LogChannel " + std::to_string(client_id) + " \"" + line + "\"\n";
+        server.Broadcast(packet);
+    }
+}
+
 void Game::HandleJoinRoom(int socket_fd, const std::string &msg_id, int client_id, std::istringstream &iss, Server &server)
 {
     int room_id;
@@ -122,8 +142,12 @@ void Game::HandleJoinRoom(int socket_fd, const std::string &msg_id, int client_i
             board_render += GetRoomPlayersString(r->GetId());
             if (r->GetState() == RoomState::NAMING)
                 board_render += "[ STATUS: VITÓRIA! AGUARDANDO NOME DA EQUIPE (!name <nome>) ]\n\n";
-            else
+            else if (r->GetState() == RoomState::LOST)
+                board_render += "[ STATUS: GAME OVER! (Digite '!start' para tentar novamente) ]\n\n";
+            else if (r->GetState() == RoomState::LOBBY)
                 board_render += "[ STATUS: LOBBY (Digite '!start' para começar) ]\n\n";
+            else
+                board_render += "[ STATUS: JOGANDO ]\n\n";
             board_render += r->GetBoard().Render();
             BroadcastToRoom(room_id, board_render, server);
         }
@@ -150,7 +174,7 @@ void Game::HandleJoinRoom(int socket_fd, const std::string &msg_id, int client_i
         return;
     }
 
-    if (r->GetState() != RoomState::LOBBY)
+    if (r->GetState() == RoomState::PLAYING || r->GetState() == RoomState::NAMING)
     {
         server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"Jogo em andamento\"\n");
         return;
@@ -241,9 +265,16 @@ void Game::HandlePlayerAction(int socket_fd, const std::string &msg_id, int clie
         bool hit_bomb = r->GetBoard().Reveal(parsed_move.row, parsed_move.col);
         if (hit_bomb)
         {
-            int penalty = (r->GetId() == 1) ? 15 : ((r->GetId() == 2) ? 20 : 30);
-            r->AddPenalty(penalty);
-            server.SendMessage(socket_fd, "BOOM! Penalidade de tempo adicionada!\n");
+            auto now = std::chrono::steady_clock::now();
+            int elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - r->GetStartTime()).count();
+            r->SetLost(elapsed);
+            r->GetBoard().RevealMines(parsed_move.row, parsed_move.col);
+            server.SendMessage(socket_fd, "Response " + msg_id + " Success\n");
+            
+            std::string lose_msg = "\nBOOM! Você pisou em uma mina. Fim de jogo em " + std::to_string(elapsed) + "s.\nDigite '!start' para reiniciar a sala.\n";
+            BroadcastToRoom(r->GetId(), lose_msg, server);
+            BroadcastRoomScreen(*r, server);
+            return;
         }
     }
 
@@ -260,7 +291,7 @@ void Game::HandlePlayerAction(int socket_fd, const std::string &msg_id, int clie
 
     if (r->GetState() == RoomState::NAMING)
     {
-        std::string win_msg = "\nPARABÉNS! Campo limpo em " + std::to_string(r->GetPenaltySeconds()) + "s.\nO jogador que criou a sala deve digitar '!name <nome_da_equipe>' para salvar o recorde!\n";
+        std::string win_msg = "\nPARABÉNS! Campo limpo em " + std::to_string(r->GetFinalSeconds()) + "s.\nQualquer jogador pode digitar '!name <nome_da_equipe>' para salvar o recorde!\n";
         BroadcastToRoom(r->GetId(), win_msg, server);
     }
 }
@@ -289,7 +320,7 @@ void Game::HandleStartGame(int socket_fd, const std::string &msg_id, int client_
     Room *r = FindRoom(p->getRoomId());
     if (!r) return;
 
-    if (r->GetState() != RoomState::LOBBY)
+    if (r->GetState() != RoomState::LOBBY && r->GetState() != RoomState::LOST)
     {
         server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"A partida já começou\"\n");
         return;
@@ -311,6 +342,12 @@ void Game::HandleNameTeam(int socket_fd, const std::string &msg_id, int client_i
         return;
     }
     std::replace(team_name.begin(), team_name.end(), ' ', '_');
+
+    if (!std::regex_match(team_name, std::regex("^[a-zA-Z0-9_]+$")))
+    {
+        server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"Nome de equipe inválido. Use apenas letras, números e underscore.\"\n");
+        return;
+    }
 
     Room *r = nullptr;
 
@@ -352,15 +389,14 @@ void Game::HandleNameTeam(int socket_fd, const std::string &msg_id, int client_i
         }
     }
 
-    Leaderboard::SaveTeamScore(r->GetStatsFile(), team_members, r->GetPenaltySeconds(), team_members.size(), team_name);
+    Leaderboard::SaveTeamScore(r->GetStatsFile(), team_members, r->GetFinalSeconds(), team_members.size(), team_name);
     
     BroadcastToRoom(r->GetId(), "\nRecorde salvo para a equipe '" + team_name + "'!\nVoltando ao LOBBY...\n", server);
-    std::this_thread::sleep_for(std::chrono::seconds(2));
     r->Reset();
     BroadcastRoomScreen(*r, server);
 }
 
-void Game::HandleRanking(int socket_fd, const std::string &msg_id, int /*client_id*/, std::istringstream &iss, Server &server)
+void Game::HandleRanking(int socket_fd, const std::string &msg_id, int client_id, std::istringstream &iss, Server &server)
 {
     std::string diff;
     if (!(iss >> diff))
@@ -385,5 +421,5 @@ void Game::HandleRanking(int socket_fd, const std::string &msg_id, int /*client_
     std::string ranking_str = Leaderboard::GetRankingString(diff, file_name);
 
     server.SendMessage(socket_fd, "Response " + msg_id + " Success\n");
-    server.SendMessage(socket_fd, ranking_str + "\n");
+    SendToPlayer(client_id, ranking_str, server);
 }

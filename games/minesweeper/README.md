@@ -11,8 +11,8 @@ This is the **Campo Minado** (Minesweeper) multiplayer game server for the **Sel
   * **Room 1 (Easy):** 10x10 board with 10 mines (Max 3 players)
   * **Room 2 (Medium):** 16x16 board with 40 mines (Max 5 players)
   * **Room 3 (Hard):** 20x20 board with 80 mines (Max 8 players)
-* **Penalty System:** Stepping on a mine doesn't end the game, but adds a time penalty (15s for Easy, 20s for Medium, 30s for Hard) to the team's final completion time.
-* **Team Leaderboard (`!rank`):** When the board is completely cleared, the host can name the team (`!name <TeamName>`) to save their completion time (plus penalties) to the persistent leaderboard.
+* **Game Over:** Stepping on a mine immediately ends the game, freezing the board and revealing all mines. The team must type `!start` to try again.
+* **Team Leaderboard (`!rank`):** When the board is completely cleared, any player can name the team (`!name <TeamName>`) to save their completion time to the persistent leaderboard.
 * **In-Game Nicknames:** Players' Lobby nicknames are synchronized directly into the match, displaying in headers and the leaderboard.
 
 ---

@@ -8,7 +8,8 @@ enum class RoomState
 {
     LOBBY,
     PLAYING,
-    NAMING
+    NAMING,
+    LOST
 };
 
 class Room
@@ -25,13 +26,14 @@ public:
     /// @brief Transitions to NAMING state and finalizes the time.
     void SetWon(int elapsed_seconds);
 
-    void AddPenalty(int seconds);
+    /// @brief Transitions to LOST state and finalizes the time.
+    void SetLost(int elapsed_seconds);
 
     int GetId() const { return _id; }
     int GetMaxPlayers() const { return _max_players; }
     RoomState GetState() const { return _state; }
     const std::string &GetStatsFile() const { return _stats_file; }
-    int GetPenaltySeconds() const { return _penalty_seconds; }
+    int GetFinalSeconds() const { return _final_seconds; }
     std::chrono::steady_clock::time_point GetStartTime() const { return _start_time; }
 
     Board &GetBoard() { return _board; }
@@ -44,6 +46,6 @@ private:
     Board _board;
     std::string _stats_file;
     std::chrono::steady_clock::time_point _start_time;
-    int _penalty_seconds;
+    int _final_seconds;
     RoomState _state;
 };

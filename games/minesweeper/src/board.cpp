@@ -56,7 +56,10 @@ bool ParseInput(const string &input, int board_size, MoveInput &move)
 
     try
     {
-        move.col = stoi(col_str);
+        size_t parsed_len = 0;
+        move.col = stoi(col_str, &parsed_len);
+        if (parsed_len != col_str.length())
+            return false;
     }
     catch (...)
     {
@@ -72,7 +75,7 @@ bool ParseInput(const string &input, int board_size, MoveInput &move)
 Board::Board(int size, int bomb_count)
     : _size(size), _bomb_count(bomb_count), _generated(false), _revealed_count(0)
 {
-    _grid.resize(_size, vector<Cell>(_size, {0, false, false}));
+    _grid.resize(_size, vector<Cell>(_size, {0, false, false, false}));
 }
 
 int Board::Size() const { return _size; }
@@ -202,6 +205,22 @@ bool Board::Reveal(int row, int col)
     return false;
 }
 
+void Board::RevealMines(int hit_row, int hit_col)
+{
+    for (int r = 0; r < _size; r++)
+    {
+        for (int c = 0; c < _size; c++)
+        {
+            if (_grid[r][c].type == 9)
+            {
+                _grid[r][c].revealed = true;
+                if (r == hit_row && c == hit_col)
+                    _grid[r][c].exploded = true;
+            }
+        }
+    }
+}
+
 void Board::SetFlag(int row, int col, bool flagged)
 {
     if (!InBounds(row, col))
@@ -269,6 +288,13 @@ string Board::Render() const
             else if (cell.type == 0)
             {
                 out += "│   ";
+            }
+            else if (cell.type == 9)
+            {
+                if (cell.exploded)
+                    out += "│\033[1;41m * \033[0m";
+                else
+                    out += "│\033[1;31m * \033[0m";
             }
             else
             {

@@ -59,8 +59,7 @@ void Game::ProcessMessage(int socket_fd, const std::string &message, Server &ser
     }
     else
     {
-        // Silently ignore unknown Lobby commands so they don't spam the UI
-        server.SendMessage(socket_fd, "Response " + msg_id + " Success\n");
+        server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"Comando desconhecido\"\n");
     }
 }
 

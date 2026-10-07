@@ -95,10 +95,6 @@ private:
     /// @param client_id The ID of the client.
     std::string GetNickname(int client_id);
 
-    /// @brief Pushes the client's nickname (if any) to the room the client is currently in.
-    /// @param client_id The ID of the client.
-    void ApplyNicknameToRoom(int client_id);
-
     /// @brief Creates a new game room.
     /// @param ctx The context containing client information and message data.
     void HandleCreateRoom(CommandContext& ctx);
