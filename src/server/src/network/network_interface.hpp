@@ -38,6 +38,9 @@ public:
     /// @brief Starts the lobby TCP server loop.
     void Start();
 
+    /// @brief Stops the lobby TCP server and closes connections.
+    void Stop();
+
 private:
     /// @brief Defines the type for command handler functions that process client commands.
     using CommandHandler = std::function<void(CommandContext& ctx)>;

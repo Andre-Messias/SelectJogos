@@ -63,3 +63,13 @@ games/minesweeper/objs/
 games/minesweeper/stats_*.txt
 
 Trabalho1.pdf
+
+# Build and object files for games and core
+games/*/build/
+games/*/objs/
+src/server/objs/
+src/client/objs/
+
+# Binaries
+src/server/lobby
+src/client/client

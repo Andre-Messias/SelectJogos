@@ -6,6 +6,20 @@
 #include "protocol_parser.hpp"
 #include "terminal_ui.hpp"
 
+TerminalUI* global_ui = nullptr;
+NetworkClient* global_network = nullptr;
+
+void HandleSigInt(int sig) {
+    if (global_network) {
+        global_network->Disconnect();
+    }
+    if (global_ui) {
+        global_ui->DisableRawMode();
+        std::cout << "\n[!] Conexão encerrada pelo usuário (Ctrl+C).\n";
+    }
+    exit(0);
+}
+
 int main(int argc, char* argv[]) {
     if (argc < 3 || argc > 4) {
         std::cerr << "Usage: " << argv[0] << " <LOBBY_IP> <LOBBY_PORT> [HELP_FILE]\n";
@@ -50,6 +64,11 @@ int main(int argc, char* argv[]) {
         std::cerr << "Error: Could not connect to Lobby at " << ip << ":" << port << "\n";
         return 1;
     }
+
+    // Register SIGINT
+    global_ui = &ui;
+    global_network = &network;
+    std::signal(SIGINT, HandleSigInt);
 
     // Start TUI event loop (blocking until exit)
     ui.Run();

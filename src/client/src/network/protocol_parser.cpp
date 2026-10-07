@@ -172,6 +172,9 @@ void ProtocolParser::HandleLocalInput(const std::string& raw_input) {
     } else if (raw_command == "!rank") {
         command = "ServerAction";
         remaining_params = "Ranking " + remaining_params;
+    } else if (raw_command == "!diff") {
+        command = "ServerAction";
+        remaining_params = "JoinRoom " + remaining_params;
     }
 
     if (command == "ServerAction" && !remaining_params.empty()) {

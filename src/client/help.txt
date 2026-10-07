@@ -13,5 +13,6 @@
 [In-Game]    PlayerAction (pa) <Args...>        - Send move to running game
 [Mines]      pa A5 | pa fA5 | pa uA5            - Reveal / flag / unflag
 [Mines]      !start | !name <T> | !rank <d>     - Start / save team / ranking
+[Mines]      !diff <1|2|3>                      - Change difficulty (Host)
 [Client]     Help (h, ?) | exit / quit          - Show help or close client
 --------------------------------------------------

@@ -3,7 +3,6 @@
 #include <iostream>
 #include <sstream>
 #include <algorithm>
-#include <regex>
 
 std::string Game::GetRoomPlayersString(int room_id)
 {
@@ -138,6 +137,12 @@ void Game::HandleJoinRoom(int socket_fd, const std::string &msg_id, int client_i
         server.SendMessage(socket_fd, "Response " + msg_id + " Success\n");
         Room *r = FindRoom(room_id);
         if (r) {
+            // Move todos os jogadores ativos para a nova dificuldade (sala)
+            for (auto &p : _players) {
+                if (p.isConnected()) {
+                    p.setRoomId(room_id);
+                }
+            }
             std::string board_render = "@SCREEN_TAG ";
             board_render += GetRoomPlayersString(r->GetId());
             if (r->GetState() == RoomState::NAMING)
@@ -271,7 +276,7 @@ void Game::HandlePlayerAction(int socket_fd, const std::string &msg_id, int clie
             r->GetBoard().RevealMines(parsed_move.row, parsed_move.col);
             server.SendMessage(socket_fd, "Response " + msg_id + " Success\n");
             
-            std::string lose_msg = "\nBOOM! Você pisou em uma mina. Fim de jogo em " + std::to_string(elapsed) + "s.\nDigite '!start' para reiniciar a sala.\n";
+            std::string lose_msg = "\nBOOM! Você pisou em uma mina. Fim de jogo.\nDigite '!start' para reiniciar a sala.\n";
             BroadcastToRoom(r->GetId(), lose_msg, server);
             BroadcastRoomScreen(*r, server);
             return;
@@ -343,7 +348,15 @@ void Game::HandleNameTeam(int socket_fd, const std::string &msg_id, int client_i
     }
     std::replace(team_name.begin(), team_name.end(), ' ', '_');
 
-    if (!std::regex_match(team_name, std::regex("^[a-zA-Z0-9_]+$")))
+    bool valid = true;
+    for (char c : team_name) {
+        if (!std::isalnum(c) && c != '_') {
+            valid = false;
+            break;
+        }
+    }
+
+    if (!valid || team_name.empty())
     {
         server.SendMessage(socket_fd, "Response " + msg_id + " Fail \"Nome de equipe inválido. Use apenas letras, números e underscore.\"\n");
         return;
@@ -421,5 +434,21 @@ void Game::HandleRanking(int socket_fd, const std::string &msg_id, int client_id
     std::string ranking_str = Leaderboard::GetRankingString(diff, file_name);
 
     server.SendMessage(socket_fd, "Response " + msg_id + " Success\n");
+
+    // ServerAction chega como client 0, e o lobby nao tem cliente com ID 0.
+    // Nesse caso manda o ranking para todos da sala.
+    if (client_id == 0)
+    {
+        std::istringstream stream(ranking_str);
+        std::string line;
+        while (std::getline(stream, line))
+        {
+            if (line.empty())
+                continue;
+            server.Broadcast("LogChannel All \"" + line + "\"\n");
+        }
+        return;
+    }
+
     SendToPlayer(client_id, ranking_str, server);
 }

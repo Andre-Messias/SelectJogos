@@ -391,3 +391,15 @@ void NetworkInterface::HandleKickPlayer(CommandContext& ctx) {
         NetworkUtils::SendMessage(target_fd, "LogChannel 0 \"You have been kicked from room " + room_name + "\"\n");
     }
 }
+void NetworkInterface::Stop() {
+    _is_running = false;
+    if (_server_fd >= 0) {
+        close(_server_fd);
+        _server_fd = -1;
+    }
+    std::lock_guard<std::mutex> lock(_clients_mutex);
+    for (auto& pair : _client_sockets) {
+        close(pair.second);
+    }
+    _client_sockets.clear();
+}

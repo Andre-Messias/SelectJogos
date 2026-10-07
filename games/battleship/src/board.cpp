@@ -103,7 +103,7 @@ std::vector<std::string> Board::Render(bool reveal_ships, int page) const {
             int cell = cells_[y][x];
             char symbol = '.';
             if (cell == 2) {
-                symbol = 'o';
+                symbol = '~';
             } else if (cell == 3) {
                 symbol = 'X';
             } else if (cell < 0 && reveal_ships) {

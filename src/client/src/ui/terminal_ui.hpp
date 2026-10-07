@@ -44,9 +44,10 @@ class TerminalUI {
 
         /// @brief Puts the terminal into raw non-canonical mode and switches to alternate buffer.
         void EnableRawMode();
-        /// @brief Restores original terminal attributes and switches back to main buffer.
-        void DisableRawMode();
 
         /// @brief Draws the entire TUI layout atomically to stdout.
         void Render();
+    public:
+        /// @brief Restores original terminal attributes and switches back to main buffer.
+        void DisableRawMode();
 };

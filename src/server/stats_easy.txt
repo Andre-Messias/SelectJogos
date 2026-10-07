@@ -1,2 +1,4 @@
 67880 107 2 pintudos
 125101 107 2 pintudos
+lycalopx2 67 2 comedores_de_cu
+lycalopx 67 2 comedores_de_cu
