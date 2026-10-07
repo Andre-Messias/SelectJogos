@@ -14,4 +14,5 @@
 [Mines]      pa A5 | pa fA5 | pa uA5            - Reveal / flag / unflag
 [Mines]      !start | !name <T> | !rank <d>     - Start / save team / ranking
 [Client]     Help (h, ?) | exit / quit          - Show help or close client
+[Client]     helpbn                             - Tutorial Batalha Naval
 --------------------------------------------------

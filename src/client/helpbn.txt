@@ -1,0 +1,21 @@
+# Tutorial da Batalha Naval.
+--- BATALHA NAVAL: COMO JOGAR ---
+1. Para selecionar o modo de jogo use:
+   'sa SetMode rapido(10x10) ou classico(15x15) ou longo(26x26)'
+
+2. Cada jogador posiciona sua frota no proprio tabuleiro:
+   'PlaceShip <tipo> <coordenada> H|V'   
+   H segue para a direita; V segue para baixo.
+   Navios nao podem sair do tabuleiro, sobrepor ou encostar.
+
+   Tipos e tamanhos: submarino=1, cruzador=2,
+   encouracado=4, portaaviao=5 casas.
+
+3. Na sua vez, use 'Fire B5' para atirar na coordenada B5.
+   O jogo informa agua, acerto ou navio afundado.
+   Um tiro valido passa a vez, mesmo se acertar um navio.
+   Tiro repetido ou fora da sua vez nao consome o turno.
+
+4. Use 'View own 1' para ver sua frota e 'View enemy 1' para ver o alvo.
+   
+5. Vence quem atingir todas as casas dos navios adversarios.

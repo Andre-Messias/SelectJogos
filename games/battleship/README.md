@@ -5,6 +5,8 @@ do SelectJogos cria uma partida separada para cada sala. Você digita os comando
 no cliente do SelectJogos, sem precisar informar `MsgID` ou iniciar o executável
 da Batalha Naval manualmente.
 
+Digite `helpbn` no cliente para abrir um tutorial curto da Batalha Naval.
+
 ## Passo 1 — Compilar e iniciar o servidor
 
 Abra um terminal na raiz do repositório:

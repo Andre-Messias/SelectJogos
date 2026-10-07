@@ -56,8 +56,9 @@ class ProtocolParser {
         /// @return The canonical command string (e.g., "pa" -> "PlayerAction"), or input_cmd if no alias matches.
         std::string ResolveCommandAlias(const std::string& input_cmd) const;
 
-        /// @brief Reads the external help file from disk and displays its lines in the UI log feed.
-        void PrintHelpMenu();
+        /// @brief Reads an external help file and displays its lines in the UI log feed.
+        /// @param filepath Name or path of the help file to read.
+        void PrintHelpMenu(const std::string& filepath);
 
         /// @brief Generates a unique message ID token in the range ["m1", "m999999"].
         /// @return The generated message ID string.

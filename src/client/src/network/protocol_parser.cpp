@@ -15,6 +15,7 @@ void ProtocolParser::RegisterAliases() {
     _command_aliases["help"] = "Help";
     _command_aliases["h"] = "Help";
     _command_aliases["?"] = "Help";
+    _command_aliases["helpbn"] = "HelpBattleShip";
 
     // Discovery commands
     _command_aliases["lg"] = "ListGames";
@@ -103,18 +104,18 @@ std::string ProtocolParser::ResolveCommandAlias(const std::string& input_cmd) co
     return input_cmd;
 }
 
-void ProtocolParser::PrintHelpMenu() {
-    std::ifstream file(_help_filepath);
+void ProtocolParser::PrintHelpMenu(const std::string& filepath) {
+    std::ifstream file(filepath);
     if (!file.is_open()) {
-        file.open("client/" + _help_filepath);
+        file.open("client/" + filepath);
     }
     if (!file.is_open()) {
-        file.open("src/client/" + _help_filepath);
+        file.open("src/client/" + filepath);
     }
 
     if (!file.is_open()) {
-        _state.SetAlert("[!] ERROR: Could not open help file '" + _help_filepath + "'");
-        _state.AddLog("[Error] Help file '" + _help_filepath + "' not found.");
+        _state.SetAlert("[!] ERROR: Could not open help file '" + filepath + "'");
+        _state.AddLog("[Error] Help file '" + filepath + "' not found.");
         return;
     }
 
@@ -155,7 +156,11 @@ void ProtocolParser::HandleLocalInput(const std::string& raw_input) {
     std::string command = ResolveCommandAlias(raw_command);
 
     if (command == "Help") {
-        PrintHelpMenu();
+        PrintHelpMenu(_help_filepath);
+        return;
+    }
+    if (command == "HelpBattleShip") {
+        PrintHelpMenu("helpbn.txt");
         return;
     }
 
