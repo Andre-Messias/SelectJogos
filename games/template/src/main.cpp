@@ -5,10 +5,6 @@
 #include "server.hpp"
 #include "game.hpp"
 
-/// @brief The main function that initializes the server and starts listening for client connections.
-/// @param argc The number of command-line arguments.
-/// @param argv The array of command-line arguments.
-/// @return 0 if the program runs successfully.
 int main(int argc, char* argv[]) {
     if (argc != 2) {
         std::cerr << "Usage: " << argv[0] << " <PORT>\n";

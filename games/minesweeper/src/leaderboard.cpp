@@ -6,8 +6,6 @@
 #include <cctype>
 #include <cstdio>
 
-/// @brief The stats file is whitespace-delimited, so names are stored as a single token.
-/// Default names like "Player 123" are written as "Player_123".
 static std::string EncodeName(const std::string &name)
 {
     std::string out = name;
@@ -15,8 +13,6 @@ static std::string EncodeName(const std::string &name)
     return out;
 }
 
-/// @brief Converts a stored token back into a display name.
-/// Legacy files stored bare numeric client IDs, which are shown as "Player <id>".
 static std::string DecodeName(const std::string &token)
 {
     bool all_digits = !token.empty() && std::all_of(token.begin(), token.end(), [](unsigned char c)
@@ -53,7 +49,7 @@ std::string Leaderboard::GetRankingString(const std::string &diff, const std::st
         return "Nenhum recorde encontrado ainda para esta dificuldade.\n";
     }
 
-    // Best (lowest) time per player name
+    // Guarda apenas o melhor tempo de cada jogador
     std::map<std::string, std::tuple<int, int, std::string>> best_times;
     std::string p_token;
     int time, p_count;

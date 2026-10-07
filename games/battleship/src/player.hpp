@@ -6,7 +6,8 @@
 #include <string>
 
 // Guarda a frota e aplica as ações individuais de um participante.
-struct Player {
+struct Player
+{
     int id;
     std::string name;
     bool connected = true;
@@ -23,16 +24,16 @@ struct Player {
     bool HasPlacedShips() const;
 
     // Confere se todos os navios exigidos pelo modo foram posicionados.
-    bool HasCompleteFleet(const FleetMode& mode) const;
+    bool HasCompleteFleet(const FleetMode &mode) const;
 
     // Verifica se ainda há vaga para um navio desse tipo.
-    bool CanPlaceShip(int type, const FleetMode& mode) const;
+    bool CanPlaceShip(int type, const FleetMode &mode) const;
 
     // Posiciona o navio e atualiza a quantidade colocada.
     bool PlaceShip(int type, int x, int y, bool vertical);
 
     // Lista os navios que ainda precisam ser posicionados.
-    std::string RemainingShips(const FleetMode& mode) const;
+    std::string RemainingShips(const FleetMode &mode) const;
 
     // Reinicia o tabuleiro e volta à primeira página.
     void ResetBoard(int size);

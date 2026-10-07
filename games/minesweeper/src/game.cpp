@@ -10,7 +10,8 @@ Game::Game() : _is_running(false)
 Game::~Game()
 {
     _is_running = false;
-    if (_inactivity_thread.joinable()) {
+    if (_inactivity_thread.joinable())
+    {
         _inactivity_thread.join();
     }
 }
@@ -22,7 +23,7 @@ void Game::InitRooms()
     _rooms.emplace_back(3, 24, 99, 4, "stats_hard.txt");   // 3 = Hard
 }
 
-void Game::Start(Server& server)
+void Game::Start(Server &server)
 {
     _is_running = true;
     _inactivity_thread = std::thread(&Game::InactivityCheckerLoop, this, std::ref(server));
@@ -94,17 +95,17 @@ void Game::RegisterCommands()
     {
         this->HandlePlayerAction(fd, mid, cid, iss, srv);
     };
-    
+
     _command_registry["StartGame"] = [this](int fd, const std::string &mid, int cid, std::istringstream &iss, Server &srv)
     {
         this->HandleStartGame(fd, mid, cid, iss, srv);
     };
-    
+
     _command_registry["NameTeam"] = [this](int fd, const std::string &mid, int cid, std::istringstream &iss, Server &srv)
     {
         this->HandleNameTeam(fd, mid, cid, iss, srv);
     };
-    
+
     _command_registry["Ranking"] = [this](int fd, const std::string &mid, int cid, std::istringstream &iss, Server &srv)
     {
         this->HandleRanking(fd, mid, cid, iss, srv);

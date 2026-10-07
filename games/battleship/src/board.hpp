@@ -5,7 +5,8 @@
 #include <vector>
 
 // Resultado de um tiro válido ou rejeitado.
-enum class Shot {
+enum class Shot
+{
     Invalid,
     Miss,
     Hit,
@@ -13,18 +14,20 @@ enum class Shot {
 };
 
 // Tamanho do tabuleiro e quantidade de navios por tipo.
-struct FleetMode {
-    const char* name;
+struct FleetMode
+{
+    const char *name;
     int size;
     std::array<int, 4> ships;
 };
 
 extern const std::array<FleetMode, 3> MODES;
 extern const std::array<int, 4> SHIP_LENGTHS;
-extern const std::array<const char*, 4> SHIP_NAMES;
+extern const std::array<const char *, 4> SHIP_NAMES;
 
 // Aplica as regras de posicionamento e ataque sobre um tabuleiro.
-class Board {
+class Board
+{
 public:
     explicit Board(int size = 10);
 
@@ -51,4 +54,4 @@ private:
 };
 
 // Converte coordenadas como A1 e Z26 para índices iniciados em zero.
-bool ParseCoordinate(const std::string& value, int size, int& x, int& y);
+bool ParseCoordinate(const std::string &value, int size, int &x, int &y);

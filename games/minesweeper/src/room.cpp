@@ -15,7 +15,8 @@ void Room::Reset()
 
 void Room::Start()
 {
-    if (_state == RoomState::LOST) {
+    if (_state == RoomState::LOST)
+    {
         Reset();
     }
     _state = RoomState::PLAYING;

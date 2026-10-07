@@ -5,20 +5,26 @@
 #include "game.hpp"
 #include "server.hpp"
 
-int main(int argc, char* argv[]) {
-    if (argc != 2) {
+int main(int argc, char *argv[])
+{
+    if (argc != 2)
+    {
         std::cerr << "Usage: " << argv[0] << " <PORT>\n";
         return 1;
     }
     std::signal(SIGPIPE, SIG_IGN);
 
     int port = 0;
-    try {
+    try
+    {
         port = std::stoi(argv[1]);
-    } catch (...) {
+    }
+    catch (...)
+    {
         return 1;
     }
-    if (port < 1 || port > 65535) {
+    if (port < 1 || port > 65535)
+    {
         return 1;
     }
 
@@ -26,9 +32,8 @@ int main(int argc, char* argv[]) {
     Game game;
 
     // O processo recebe comandos do lobby, não diretamente dos jogadores.
-    server.OnMessageReceived([&](int fd, const std::string& line) {
-        game.ProcessMessage(fd, line, server);
-    });
+    server.OnMessageReceived([&](int fd, const std::string &line)
+                             { game.ProcessMessage(fd, line, server); });
 
     server.Start();
     return 0;

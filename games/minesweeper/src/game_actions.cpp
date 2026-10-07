@@ -136,10 +136,13 @@ void Game::HandleJoinRoom(int socket_fd, const std::string &msg_id, int client_i
         _active_room_id = room_id;
         server.SendMessage(socket_fd, "Response " + msg_id + " Success\n");
         Room *r = FindRoom(room_id);
-        if (r) {
+        if (r)
+        {
             // Move todos os jogadores ativos para a nova dificuldade (sala)
-            for (auto &p : _players) {
-                if (p.isConnected()) {
+            for (auto &p : _players)
+            {
+                if (p.isConnected())
+                {
                     p.setRoomId(room_id);
                 }
             }
@@ -275,7 +278,7 @@ void Game::HandlePlayerAction(int socket_fd, const std::string &msg_id, int clie
             r->SetLost(elapsed);
             r->GetBoard().RevealMines(parsed_move.row, parsed_move.col);
             server.SendMessage(socket_fd, "Response " + msg_id + " Success\n");
-            
+
             std::string lose_msg = "\nBOOM! Você pisou em uma mina. Fim de jogo.\nDigite '!start' para reiniciar a sala.\n";
             BroadcastToRoom(r->GetId(), lose_msg, server);
             BroadcastRoomScreen(*r, server);
@@ -306,7 +309,8 @@ void Game::HandleStartGame(int socket_fd, const std::string &msg_id, int client_
     if (client_id == 0)
     {
         Room *r = FindRoom(_active_room_id);
-        if (r) {
+        if (r)
+        {
             r->Start();
             server.SendMessage(socket_fd, "Response " + msg_id + " Success\n");
             BroadcastToRoom(r->GetId(), "A partida começou! Boa sorte!\n", server);
@@ -323,7 +327,8 @@ void Game::HandleStartGame(int socket_fd, const std::string &msg_id, int client_
     }
 
     Room *r = FindRoom(p->getRoomId());
-    if (!r) return;
+    if (!r)
+        return;
 
     if (r->GetState() != RoomState::LOBBY && r->GetState() != RoomState::LOST)
     {
@@ -349,8 +354,10 @@ void Game::HandleNameTeam(int socket_fd, const std::string &msg_id, int client_i
     std::replace(team_name.begin(), team_name.end(), ' ', '_');
 
     bool valid = true;
-    for (char c : team_name) {
-        if (!std::isalnum(c) && c != '_') {
+    for (char c : team_name)
+    {
+        if (!std::isalnum(c) && c != '_')
+        {
             valid = false;
             break;
         }
@@ -385,7 +392,8 @@ void Game::HandleNameTeam(int socket_fd, const std::string &msg_id, int client_i
         r = FindRoom(p->getRoomId());
     }
 
-    if (!r) return;
+    if (!r)
+        return;
 
     if (r->GetState() != RoomState::NAMING)
     {
@@ -394,16 +402,18 @@ void Game::HandleNameTeam(int socket_fd, const std::string &msg_id, int client_i
     }
 
     server.SendMessage(socket_fd, "Response " + msg_id + " Success\n");
-    
+
     std::vector<std::string> team_members;
-    for (const auto &p_check : _players) {
-        if (p_check.getRoomId() == r->GetId() && p_check.isConnected()) {
+    for (const auto &p_check : _players)
+    {
+        if (p_check.getRoomId() == r->GetId() && p_check.isConnected())
+        {
             team_members.push_back(p_check.getName());
         }
     }
 
     Leaderboard::SaveTeamScore(r->GetStatsFile(), team_members, r->GetFinalSeconds(), team_members.size(), team_name);
-    
+
     BroadcastToRoom(r->GetId(), "\nRecorde salvo para a equipe '" + team_name + "'!\nVoltando ao LOBBY...\n", server);
     r->Reset();
     BroadcastRoomScreen(*r, server);

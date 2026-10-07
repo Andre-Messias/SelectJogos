@@ -20,13 +20,10 @@ public:
     void Reset();
     void Start();
 
-    /// @brief Marks the start time of the match when the first click happens.
     void RecordFirstClick();
 
-    /// @brief Transitions to NAMING state and finalizes the time.
     void SetWon(int elapsed_seconds);
 
-    /// @brief Transitions to LOST state and finalizes the time.
     void SetLost(int elapsed_seconds);
 
     int GetId() const { return _id; }
